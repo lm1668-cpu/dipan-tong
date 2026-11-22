@@ -861,6 +861,8 @@ export function useSessionUser() {
   return members.find((m) => m.id === sessionUserId) ?? null;
 }
 
+const EMPTY_ARR: never[] = [];
+
 export function useScope() {
   const companies = useAppStore((s) => s.companies);
   const members = useAppStore((s) => s.members);
@@ -870,11 +872,11 @@ export function useScope() {
   const materials = useAppStore((s) => s.materials);
   const files = useAppStore((s) => s.files);
   const audits = useAppStore((s) => s.audits);
-  const checkinsAll = useAppStore((s) => s.checkins ?? []);
-  const nudgesAll = useAppStore((s) => s.nudges ?? []);
-  const dayClosesAll = useAppStore((s) => s.dayCloses ?? []);
-  const instructionsAll = useAppStore((s) => s.instructions ?? []);
-  const touchesAll = useAppStore((s) => s.touches ?? []);
+  const checkinsAll = useAppStore((s) => s.checkins) ?? EMPTY_ARR;
+  const nudgesAll = useAppStore((s) => s.nudges) ?? EMPTY_ARR;
+  const dayClosesAll = useAppStore((s) => s.dayCloses) ?? EMPTY_ARR;
+  const instructionsAll = useAppStore((s) => s.instructions) ?? EMPTY_ARR;
+  const touchesAll = useAppStore((s) => s.touches) ?? EMPTY_ARR;
   const sessionUserId = useAppStore((s) => s.sessionUserId);
   const hydrated = useAppStore((s) => s._hydrated);
   const user = members.find((m) => m.id === sessionUserId) ?? null;
