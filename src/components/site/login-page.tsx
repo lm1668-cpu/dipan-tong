@@ -57,12 +57,13 @@ export function LoginPage() {
                       key={id}
                       type="button"
                       data-testid={`login-${id}`}
-                      className="flex min-h-16 items-center gap-3 rounded-3xl border border-line bg-card p-4 text-left shadow-card"
-                      onClick={() => enter(member.id, member.role)}
+                      disabled={Boolean(member.disabled)}
+                      className="flex min-h-16 items-center gap-3 rounded-3xl border border-line bg-card p-4 text-left shadow-card disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => { if (!member.disabled) enter(member.id, member.role); }}
                     >
                       <Mark text={company?.mark ?? "台"} size="sm" />
                       <span>
-                        <span className="block font-medium">{member.name}</span>
+                        <span className="block font-medium">{member.name}{member.disabled ? "（已停用）" : ""}</span>
                         <span className="block text-sm text-muted">{ROLE_LABEL[member.role]} · {member.blurb}</span>
                       </span>
                     </button>

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { MaterialDialog, PersonDialog } from "@/components/site/forms";
 import { LoopRail, platformLoop } from "@/components/site/loops";
+import { SuperAdminPanels } from "@/components/site/super-admin";
 import { Badge, Banner, Button, Card, Denied, Empty, Field, NoticeList, ProgressBar, Select, TextInput } from "@/components/site/ui";
 import {
   MATERIAL_LABEL,
@@ -481,6 +482,7 @@ export function AdminPage() {
         <p className="text-sm text-muted">平台只管理訂閱。入唔到客人工地日誌。示範數據其實喺同一部瀏覽器，正式環境要後端按公司隔離。</p>
       </div>
       {feedback ? <Banner tone={feedback.tone}>{feedback.text}</Banner> : null}
+      <SuperAdminPanels />
       <CatalogEditor />
       <LoopRail
         kicker="平台一日"

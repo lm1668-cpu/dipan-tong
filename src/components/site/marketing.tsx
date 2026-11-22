@@ -170,7 +170,16 @@ export function MarketingPage() {
                   {inner}
                 </Link>
               ) : (
-                <a key={action.label} href={action.href} className={className}>
+                <a
+                  key={action.label}
+                  href={action.href}
+                  className={className}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const id = action.href.replace(/^#/, "");
+                    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
                   {inner}
                 </a>
               );

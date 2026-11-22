@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { DemoBanner, BrandMark, Mark } from "@/components/site/ui";
-import { ROLE_LABEL, assetUrl, isOverdue, todayISO } from "@/lib/site/model";
+import { DEFAULT_FEATURE_FLAGS, ROLE_LABEL, assetUrl, isOverdue, todayISO, type FeatureFlags } from "@/lib/site/model";
 import { useAppStore, useScope } from "@/lib/site/store";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ const MAIN: Item[] = [
   { to: "/app/logs", label: "紀錄", icon: NotebookPen, testid: "nav-logs" },
 ];
 
-function moreFor(role: string | undefined): Item[] {
+function moreFor(role: string | undefined, flags: FeatureFlags): Item[] {
   if (role === "platform_admin") {
     return [
       { to: "/app/admin", label: "客戶公司", icon: Building2, testid: "nav-admin" },
@@ -39,10 +39,10 @@ function moreFor(role: string | undefined): Item[] {
   }
   const items: Item[] = [];
   if (role !== "subcontractor") items.push({ to: "/app/people", label: "人手／分判", icon: Users, testid: "nav-people" });
-  items.push({ to: "/app/materials", label: "材料", icon: Package, testid: "nav-materials" });
-  items.push({ to: "/app/files", label: "文件／相片", icon: FolderOpen, testid: "nav-files" });
-  if (role !== "subcontractor") items.push({ to: "/app/reports", label: "報表", icon: ChartColumn, testid: "nav-reports" });
-  if (role === "company_admin" || role === "project_manager" || role === "site_supervisor") {
+  if (flags.materials) items.push({ to: "/app/materials", label: "材料", icon: Package, testid: "nav-materials" });
+  if (flags.files) items.push({ to: "/app/files", label: "文件／相片", icon: FolderOpen, testid: "nav-files" });
+  if (role !== "subcontractor" && flags.reports) items.push({ to: "/app/reports", label: "報表", icon: ChartColumn, testid: "nav-reports" });
+  if (flags.billing && (role === "company_admin" || role === "project_manager" || role === "site_supervisor")) {
     items.push({ to: "/app/billing", label: "套餐", icon: CreditCard, testid: "nav-billing" });
   }
   items.push({ to: "/app/account", label: "帳戶", icon: CircleUser, testid: "nav-account" });
@@ -83,7 +83,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const items = moreFor(user.role);
+  const flags = useAppStore((s) => s.featureFlags) ?? DEFAULT_FEATURE_FLAGS;
+  const mainItems = MAIN.filter((item) => {
+    if (item.to === "/app/tasks" && !flags.tasks) return false;
+    if (item.to === "/app/logs" && !flags.logs) return false;
+    return true;
+  });
+  const items = moreFor(user.role, flags);
   const today = todayISO();
   const open = tasks.filter((t) => t.status !== "done" && (t.due <= today || isOverdue(t, today))).length;
   const home = user.role === "platform_admin" ? "/app/admin" : "/app";
@@ -107,7 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {user.role !== "platform_admin"
-            ? MAIN.map((item) => (
+            ? mainItems.map((item) => (
                 <Link key={item.to} to={item.to} data-testid={item.testid} className={linkClass(active(path, item))}>
                   <item.icon className="size-4" />
                   {item.label}
@@ -162,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))
           ) : (
             <>
-              {MAIN.map((item) => (
+              {mainItems.map((item) => (
                 <Link key={item.to} to={item.to} data-testid={item.testid} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-bold", active(path, item) ? "bg-gold text-ink" : "text-card")}>
                   <item.icon className="size-5" />
                   {item.label}
