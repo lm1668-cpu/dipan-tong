@@ -1,6 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { createDemoData } from "@/lib/site/seed";
+import { cloudProfileToMember, cloudSignOut, type CloudProfile } from "@/lib/firebase/auth";
+import {
+  loadCloudData,
+  pushCatalogToCloud,
+  pushFileToCloud,
+  pushLogToCloud,
+  pushMaterialToCloud,
+  pushSiteToCloud,
+  pushTaskToCloud,
+} from "@/lib/firebase/sync";
 import {
   can,
   canSeeSite,
@@ -47,10 +57,14 @@ import {
 
 interface Store extends DemoData {
   _hydrated: boolean;
+  authMode: "demo" | "firebase";
+  cloudUserEmail: string | null;
+  cloudStatus: "offline" | "connecting" | "connected" | "error";
   sessionUserId: string | null;
   focusTaskId: string | null;
   focusLogId: string | null;
   signIn: (id: string) => void;
+  enterCloudSession: (profile: CloudProfile) => Promise<void>;
   signOut: () => void;
   resetDemo: () => void;
   setFocusTask: (id: string | null) => void;
@@ -110,11 +124,54 @@ export const useAppStore = create<Store>()(
     (set, get) => ({
       ...createDemoData(),
       _hydrated: false,
+      authMode: "demo",
+      cloudUserEmail: null,
+      cloudStatus: "offline",
       sessionUserId: null,
       focusTaskId: null,
       focusLogId: null,
-      signIn: (id) => set({ sessionUserId: id }),
-      signOut: () => set({ sessionUserId: null, focusTaskId: null, focusLogId: null }),
+      signIn: (id) => set({ sessionUserId: id, authMode: "demo", cloudUserEmail: null, cloudStatus: "offline" }),
+      enterCloudSession: async (profile) => {
+        const member = cloudProfileToMember(profile);
+        set((state) => ({
+          authMode: "firebase",
+          cloudUserEmail: profile.email,
+          cloudStatus: "connecting",
+          sessionUserId: member.id,
+          members: state.members.some((m) => m.id === member.id)
+            ? state.members.map((m) => (m.id === member.id ? member : m))
+            : [...state.members, member],
+        }));
+        try {
+          const snap = await loadCloudData(profile.role, profile.companyId, profile.uid);
+          set((state) => ({
+            cloudStatus: "connected",
+            companies: snap.companies.length ? snap.companies : state.companies,
+            sites: snap.sites.length ? snap.sites : profile.role === "platform_admin" ? [] : state.sites.filter((s) => s.companyId === profile.companyId),
+            logs: snap.logs.length ? snap.logs : [],
+            tasks: snap.tasks.length ? snap.tasks : [],
+            materials: snap.materials.length ? snap.materials : [],
+            files: snap.files.length ? snap.files : [],
+            members: snap.people.length
+              ? [member, ...snap.people.filter((p) => p.id !== member.id)]
+              : state.members,
+            catalog: snap.catalog ?? state.catalog,
+          }));
+        } catch {
+          set({ cloudStatus: "error" });
+        }
+      },
+      signOut: () => {
+        void cloudSignOut();
+        set({
+          sessionUserId: null,
+          authMode: "demo",
+          cloudUserEmail: null,
+          cloudStatus: "offline",
+          focusTaskId: null,
+          focusLogId: null,
+        });
+      },
       resetDemo: () => {
         const sessionUserId = get().sessionUserId;
         set({ ...createDemoData(), sessionUserId, focusTaskId: null, focusLogId: null });
@@ -162,6 +219,7 @@ export const useAppStore = create<Store>()(
             logs: state.logs.map((l) => (l.id === editing.id ? next : l)),
             nudges: submittedNudges(state.nudges, site.id, input.date, stamp, Boolean(input.submit) || editing.status === "submitted"),
           });
+          if (state.authMode === "firebase") void pushLogToCloud(next);
           return { ok: true, id: editing.id };
         }
         const id = uid("log");
@@ -191,6 +249,7 @@ export const useAppStore = create<Store>()(
           companies,
           nudges: submittedNudges(state.nudges, site.id, input.date, stamp, input.submit),
         });
+        if (state.authMode === "firebase") void pushLogToCloud(log);
         return { ok: true, id };
       },
       saveTask: (input) => {
@@ -255,6 +314,7 @@ export const useAppStore = create<Store>()(
           ? state.companies.map((c) => (c.id === site.companyId ? bumpStorage(c, input.photos.length * 0.1) : c))
           : state.companies;
         set({ tasks: [task, ...state.tasks], sites: sitesNext, companies });
+        if (state.authMode === "firebase") void pushTaskToCloud(task);
         return { ok: true, id, warning };
       },
       actTask: (id, command) => {
@@ -330,6 +390,7 @@ export const useAppStore = create<Store>()(
         }
         next.updatedAt = stamp;
         set({ tasks: state.tasks.map((t) => (t.id === id ? next : t)), sites: sitesNext });
+        if (state.authMode === "firebase") void pushTaskToCloud(next);
         return { ok: true, id, warning };
       },
       saveMaterial: (input) => {
@@ -354,6 +415,7 @@ export const useAppStore = create<Store>()(
           updatedAt: nowStamp(),
         };
         set({ materials: [item, ...state.materials] });
+        if (state.authMode === "firebase") void pushMaterialToCloud(item);
         return { ok: true, id: item.id };
       },
       setMaterialStatus: (id, status) => {
@@ -395,6 +457,7 @@ export const useAppStore = create<Store>()(
           ? "儲存已過套餐建議上限。檔案已保留，唔會刪走現有相。"
           : undefined;
         set({ files: [file, ...state.files], companies });
+        if (state.authMode === "firebase") void pushFileToCloud(file);
         return { ok: true, id: file.id, warning };
       },
       saveSite: (input) => {
@@ -434,6 +497,7 @@ export const useAppStore = create<Store>()(
           status: "active",
         };
         set({ sites: [site, ...state.sites] });
+        if (state.authMode === "firebase") void pushSiteToCloud(site);
         const notices = usageNotices(company, {
           sites: count + 1,
           seats: state.members.filter((m) => m.companyId === company.id).length,
@@ -714,6 +778,7 @@ export const useAppStore = create<Store>()(
           updatedAt: nowStamp(),
         };
         set({ materials: [item, ...state.materials] });
+        if (state.authMode === "firebase") void pushMaterialToCloud(item);
         return { ok: true, id: item.id };
       },
       confirmMaterial: (id) => {
@@ -794,7 +859,9 @@ export const useAppStore = create<Store>()(
         const list = base[kind];
         if (list.includes(name)) return fail("呢項已經有");
         if (list.length >= 20) return fail("最多二十項，先刪走唔用嘅");
-        set({ catalog: { ...base, [kind]: [...list, name] } });
+        const nextCat = { ...base, [kind]: [...list, name] };
+        set({ catalog: nextCat });
+        if (state.authMode === "firebase") void pushCatalogToCloud(nextCat);
         return { ok: true };
       },
       removeCatalogItem: (kind, label) => {
