@@ -6,27 +6,36 @@ import {
   canSeeSite,
   canSeeTask,
   firstError,
+  logState,
   nowStamp,
   PLANS,
   siteProgress,
+  todayISO,
+  addDays,
   uid,
   usageNotices,
   validateLog,
   validateMaterial,
   validateTask,
   type Audit,
+  type CheckIn,
   type Company,
   type CompanyStatus,
   type DailyLog,
+  type DayClose,
   type DemoData,
   type DocFile,
+  type Instruction,
   type LogInput,
   type MaterialInput,
   type MaterialItem,
   type Member,
   type MutResult,
+  type Nudge,
+  type OptionCatalog,
   type Photo,
   type PlanId,
+  type PlatformTouch,
   type Role,
   type Site,
   type Task,
@@ -63,6 +72,19 @@ interface Store extends DemoData {
   toggleSub: (siteId: string, memberId: string) => MutResult;
   addMember: (input: { name: string; role: Role; trade: string; phone: string }) => MutResult;
   setSubscription: (companyId: string, plan: PlanId, status: CompanyStatus) => MutResult;
+  arrive: (siteId: string) => MutResult;
+  leave: (siteId: string, note?: string) => MutResult;
+  markAbsent: (siteId: string, reason: string) => MutResult;
+  nudgeLog: (siteId: string, note: string) => MutResult;
+  closeDay: (siteId: string, note: string) => MutResult;
+  addInstruction: (siteId: string, text: string) => MutResult;
+  ackInstruction: (id: string) => MutResult;
+  requestMaterial: (input: { siteId: string; name: string; qty: string; note: string }) => MutResult;
+  confirmMaterial: (id: string) => MutResult;
+  touchCompany: (companyId: string, note: string) => MutResult;
+  extendTrial: (companyId: string) => MutResult;
+  addCatalogItem: (kind: keyof OptionCatalog, label: string) => MutResult;
+  removeCatalogItem: (kind: keyof OptionCatalog, label: string) => MutResult;
 }
 
 function currentUser(state: DemoData & { sessionUserId: string | null }) {
@@ -101,6 +123,10 @@ export const useAppStore = create<Store>()(
         const site = state.sites.find((s) => s.id === input.siteId);
         if (!site) return fail("搵唔到工地");
         const editing = input.id ? state.logs.find((l) => l.id === input.id) : undefined;
+        if (input.id && !editing) return fail("搵唔到呢份日誌");
+        if (editing && (editing.companyId !== site.companyId || editing.siteId !== site.id)) {
+          return fail("你冇權限改呢份日誌");
+        }
         const allowed = editing ? can(user, "edit_log", site) : can(user, "create_log", site);
         if (!allowed) return fail("你冇權限寫呢個工地嘅日誌");
         const errors = validateLog(input);
@@ -127,7 +153,10 @@ export const useAppStore = create<Store>()(
             revisions,
             updatedAt: stamp,
           };
-          set({ logs: state.logs.map((l) => (l.id === editing.id ? next : l)) });
+          set({
+            logs: state.logs.map((l) => (l.id === editing.id ? next : l)),
+            nudges: submittedNudges(state.nudges, site.id, input.date, stamp, Boolean(input.submit) || editing.status === "submitted"),
+          });
           return { ok: true, id: editing.id };
         }
         const id = uid("log");
@@ -152,7 +181,11 @@ export const useAppStore = create<Store>()(
         const companies = input.photos.length
           ? state.companies.map((c) => (c.id === site.companyId ? bumpStorage(c, input.photos.length * 0.1) : c))
           : state.companies;
-        set({ logs: [log, ...state.logs], companies });
+        set({
+          logs: [log, ...state.logs],
+          companies,
+          nudges: submittedNudges(state.nudges, site.id, input.date, stamp, input.submit),
+        });
         return { ok: true, id };
       },
       saveTask: (input) => {
@@ -165,7 +198,33 @@ export const useAppStore = create<Store>()(
         if (firstError(errors)) return fail(firstError(errors));
         const stamp = nowStamp();
         const id = uid("task");
-        const assigneeId = input.assigneeId;
+        let assigneeId = input.assigneeId;
+        let subId = input.subId;
+        if (user.role === "subcontractor") {
+          if (assigneeId && assigneeId !== user.id) return fail("分判唔可以派單畀其他人");
+          assigneeId = user.id;
+          subId = user.id;
+        }
+        const assignee = assigneeId ? state.members.find((m) => m.id === assigneeId) : undefined;
+        if (assigneeId && (!assignee || assignee.companyId !== site.companyId)) {
+          return fail("呢個人唔係呢間公司");
+        }
+        const subMember = subId ? state.members.find((m) => m.id === subId) : undefined;
+        if (subId && (!subMember || subMember.companyId !== site.companyId)) {
+          return fail("呢個分判唔係呢間公司");
+        }
+        if (assignee?.role === "subcontractor") {
+          subId = assignee.id;
+        }
+        let sitesNext = state.sites;
+        let warning: string | undefined;
+        const targetSub = assignee?.role === "subcontractor" ? assignee : subMember?.role === "subcontractor" ? subMember : undefined;
+        if (targetSub && !site.assignedSubIds.includes(targetSub.id)) {
+          sitesNext = state.sites.map((item) =>
+            item.id === site.id ? { ...item, assignedSubIds: [...item.assignedSubIds, targetSub.id] } : item,
+          );
+          warning = `已將${targetSub.name}加入${site.name}。唔加入佢睇唔到張單。`;
+        }
         const task: Task = {
           id,
           companyId: site.companyId,
@@ -177,20 +236,21 @@ export const useAppStore = create<Store>()(
           photos: input.photos,
           donePhotos: [],
           assigneeId,
-          subId: input.subId,
+          subId,
           priority: input.priority,
           due: input.due,
           status: assigneeId ? "pending" : "unassigned",
           blocked: false,
           blockReason: "",
+          needsRework: false,
           activity: [{ at: stamp, byName: user.name, action: assigneeId ? "開咗呢張單，並分派" : "開咗呢張單，未分派" }],
           updatedAt: stamp,
         };
         const companies = input.photos.length
           ? state.companies.map((c) => (c.id === site.companyId ? bumpStorage(c, input.photos.length * 0.1) : c))
           : state.companies;
-        set({ tasks: [task, ...state.tasks], companies });
-        return { ok: true, id };
+        set({ tasks: [task, ...state.tasks], sites: sitesNext, companies });
+        return { ok: true, id, warning };
       },
       actTask: (id, command) => {
         const state = get();
@@ -201,16 +261,28 @@ export const useAppStore = create<Store>()(
         const site = state.sites.find((s) => s.id === task.siteId);
         if (!site || !canSeeTask(user, task, site)) return fail("你冇權限睇呢張單");
         const stamp = nowStamp();
-        let next = { ...task, activity: [...task.activity], donePhotos: [...task.donePhotos] };
+        let next = { ...task, activity: [...task.activity], donePhotos: [...task.donePhotos], needsRework: task.needsRework };
         const push = (action: string) => next.activity.push({ at: stamp, byName: user.name, action });
+        let sitesNext = state.sites;
+        let warning: string | undefined;
         if (command.type === "assign") {
           if (!can(user, "approve_task", site)) return fail("分判唔可以改派");
           if (!command.assigneeId) return fail("請揀負責人");
+          const person = state.members.find((m) => m.id === command.assigneeId);
+          if (person && person.companyId !== site.companyId) return fail("呢個人唔係呢間公司");
           next.assigneeId = command.assigneeId;
-          next.subId = command.subId;
+          next.subId = command.subId ?? (person?.role === "subcontractor" ? person.id : next.subId);
           if (next.status === "unassigned") next.status = "pending";
-          const name = state.members.find((m) => m.id === command.assigneeId)?.name ?? "同事";
-          push(`改派畀${name}`);
+          const name = person?.name ?? "同事";
+          if (person?.role === "subcontractor" && !site.assignedSubIds.includes(person.id)) {
+            sitesNext = state.sites.map((item) =>
+              item.id === site.id ? { ...item, assignedSubIds: [...item.assignedSubIds, person.id] } : item,
+            );
+            warning = `已將${name}加入${site.name}。唔加入佢睇唔到張單。`;
+            push(`改派畀${name}，並加入呢個盤`);
+          } else {
+            push(`改派畀${name}`);
+          }
         } else if (command.type === "start") {
           if (!can(user, "update_task", site)) return fail("你冇權限更新呢張單");
           if (next.status === "done" || next.status === "review") return fail("呢張單而家唔可以重新開工");
@@ -221,6 +293,7 @@ export const useAppStore = create<Store>()(
           if (!can(user, "update_task", site)) return fail("你冇權限更新呢張單");
           if (next.status !== "in_progress" && next.status !== "pending") return fail("未開始就交唔到去驗收");
           next.status = "review";
+          next.needsRework = false;
           next.donePhotos = [...next.donePhotos, ...command.donePhotos];
           push(command.donePhotos.length ? "交去驗收，附上完工相" : "交去驗收");
         } else if (command.type === "approve") {
@@ -228,12 +301,14 @@ export const useAppStore = create<Store>()(
           if (next.blocked) return fail("受阻緊，未可以驗收");
           if (next.status !== "review") return fail("未交到驗收");
           next.status = "done";
+          next.needsRework = false;
           push("驗收完成");
         } else if (command.type === "return") {
           if (!can(user, "approve_task", site)) return fail("退回要主管、經理或者公司管理員先得");
           if (!command.note.trim()) return fail("請寫退回原因");
           if (next.status !== "review") return fail("呢張單唔係待驗收");
           next.status = "in_progress";
+          next.needsRework = true;
           push(`退回修改：${command.note.trim()}`);
         } else if (command.type === "block") {
           if (!can(user, "update_task", site)) return fail("你冇權限標記受阻");
@@ -249,8 +324,8 @@ export const useAppStore = create<Store>()(
           push("解除受阻");
         }
         next.updatedAt = stamp;
-        set({ tasks: state.tasks.map((t) => (t.id === id ? next : t)) });
-        return { ok: true, id };
+        set({ tasks: state.tasks.map((t) => (t.id === id ? next : t)), sites: sitesNext });
+        return { ok: true, id, warning };
       },
       saveMaterial: (input) => {
         const state = get();
@@ -327,6 +402,8 @@ export const useAppStore = create<Store>()(
         if (!input.supervisorId) return fail("請揀負責人");
         const company = state.companies.find((c) => c.id === user.companyId);
         if (!company) return fail("搵唔到公司");
+        const sup = state.members.find((m) => m.id === input.supervisorId && m.companyId === company.id);
+        if (!sup) return fail("負責人唔係呢間公司嘅人");
         const count = state.sites.filter((s) => s.companyId === company.id).length;
         const id = uid("site");
         const covers = ["/photos/site-home.jpg", "/photos/site-office.jpg", "/photos/site-duplex.jpg", "/photos/site-clinic.jpg"];
@@ -436,10 +513,312 @@ export const useAppStore = create<Store>()(
         });
         return { ok: true };
       },
+      arrive: (siteId) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === siteId);
+        if (!site || !can(user, "check_in", site)) return fail("你唔係呢個盤嘅人");
+        const date = todayISO();
+        const stamp = nowStamp();
+        const existing = state.checkins.find((row) => row.siteId === siteId && row.memberId === user.id && row.date === date);
+        if (existing && !existing.leftAt && !existing.absent) return fail("你已經報到，未收工。");
+        if (existing) {
+          set({
+            checkins: state.checkins.map((row) =>
+              row.id === existing.id ? { ...row, leftAt: null, arrivedAt: stamp, absent: false, note: "" } : row,
+            ),
+          });
+          return { ok: true, id: existing.id };
+        }
+        const row: CheckIn = {
+          id: uid("in"),
+          companyId: site.companyId,
+          siteId,
+          memberId: user.id,
+          memberName: user.name,
+          trade: user.trade || user.title,
+          date,
+          arrivedAt: stamp,
+          leftAt: null,
+          note: "",
+          absent: false,
+        };
+        set({ checkins: [row, ...state.checkins] });
+        return { ok: true, id: row.id };
+      },
+      leave: (siteId, note = "") => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === siteId);
+        if (!site || !can(user, "check_in", site)) return fail("你唔係呢個盤嘅人");
+        const date = todayISO();
+        const existing = state.checkins.find((row) => row.siteId === siteId && row.memberId === user.id && row.date === date && !row.leftAt && !row.absent);
+        if (!existing) return fail("你今日未報到，或者已經收工。");
+        const stamp = nowStamp();
+        set({
+          checkins: state.checkins.map((row) => (row.id === existing.id ? { ...row, leftAt: stamp, note: note.trim() } : row)),
+        });
+        return { ok: true, id: existing.id };
+      },
+      markAbsent: (siteId, reason) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === siteId);
+        if (!site || !can(user, "check_in", site)) return fail("你唔係呢個盤嘅人");
+        if (!reason.trim()) return fail("寫低點解今日去唔到");
+        const date = todayISO();
+        const stamp = nowStamp();
+        const existing = state.checkins.find((row) => row.siteId === siteId && row.memberId === user.id && row.date === date);
+        if (existing && !existing.leftAt && !existing.absent) return fail("你已經喺場。要走先收工，唔好標去唔到。");
+        if (existing?.absent) return fail("你已經話過今日去唔到。");
+        if (existing) return fail("你今日已經收過工。");
+        const row: CheckIn = {
+          id: uid("in"),
+          companyId: site.companyId,
+          siteId,
+          memberId: user.id,
+          memberName: user.name,
+          trade: user.trade || user.title,
+          date,
+          arrivedAt: stamp,
+          leftAt: stamp,
+          note: reason.trim(),
+          absent: true,
+        };
+        set({ checkins: [row, ...state.checkins] });
+        return { ok: true, id: row.id };
+      },
+      nudgeLog: (siteId, note) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === siteId);
+        if (!site || !can(user, "nudge_log", site)) return fail("只有老闆同項目經理可以催交日誌");
+        if (!note.trim()) return fail("寫低想主管交咩");
+        const date = todayISO();
+        if (logState(state.logs, siteId, date) === "submitted") return fail("呢個盤今日日誌已交，唔使催。");
+        if (state.nudges.some((row) => row.siteId === siteId && row.date === date && !row.resolvedAt)) {
+          return fail("今日已經催過，等主管交。");
+        }
+        const row: Nudge = {
+          id: uid("nudge"),
+          companyId: site.companyId,
+          siteId,
+          date,
+          byName: user.name,
+          note: note.trim(),
+          at: nowStamp(),
+          resolvedAt: null,
+        };
+        set({ nudges: [row, ...state.nudges] });
+        return { ok: true, id: row.id };
+      },
+      closeDay: (siteId, note) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === siteId);
+        if (!site || !can(user, "close_day", site)) return fail("你冇權限幫呢個盤收工");
+        if (!note.trim()) return fail("寫低今日有咩要交帶");
+        const date = todayISO();
+        if (logState(state.logs, siteId, date) !== "submitted") {
+          return fail("未交今日日誌。寫低做咗咩，或者剔「今日無施工」，提交咗先算收工。");
+        }
+        const openReviews = state.tasks.filter((task) => task.siteId === siteId && task.status === "review").length;
+        const stamp = nowStamp();
+        const existing = state.dayCloses.find((row) => row.siteId === siteId && row.date === date);
+        const row: DayClose = {
+          id: existing?.id ?? uid("close"),
+          companyId: site.companyId,
+          siteId,
+          date,
+          byName: user.name,
+          note: note.trim(),
+          at: stamp,
+          openReviews,
+        };
+        const dayCloses = existing
+          ? state.dayCloses.map((item) => (item.id === existing.id ? row : item))
+          : [row, ...state.dayCloses];
+        set({ dayCloses });
+        return {
+          ok: true,
+          id: row.id,
+          warning: openReviews ? `已收工。仲有 ${openReviews} 張單等驗收，聽日第一時間收。` : undefined,
+        };
+      },
+      addInstruction: (siteId, text) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === siteId);
+        if (!site || !can(user, "instruct", site)) return fail("只有老闆同項目經理可以落指示");
+        if (!text.trim()) return fail("寫低指示");
+        const row: Instruction = {
+          id: uid("ins"),
+          companyId: site.companyId,
+          siteId,
+          byName: user.name,
+          text: text.trim(),
+          at: nowStamp(),
+          ackByName: null,
+          ackAt: null,
+        };
+        set({ instructions: [row, ...state.instructions] });
+        return { ok: true, id: row.id };
+      },
+      ackInstruction: (id) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const item = state.instructions.find((row) => row.id === id);
+        if (!item) return fail("搵唔到呢句指示");
+        const site = state.sites.find((s) => s.id === item.siteId);
+        if (!site || !can(user, "close_day", site)) return fail("指示由主管回覆");
+        if (item.ackAt) return fail("已經有人回過。");
+        const stamp = nowStamp();
+        set({
+          instructions: state.instructions.map((row) =>
+            row.id === id ? { ...row, ackByName: user.name, ackAt: stamp } : row,
+          ),
+        });
+        return { ok: true, id };
+      },
+      requestMaterial: (input) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const site = state.sites.find((s) => s.id === input.siteId);
+        if (!site || !can(user, "request_material", site)) return fail("你冇權限喺呢個盤叫料");
+        if (!input.name.trim()) return fail("寫低叫咩料");
+        if (!input.qty.trim()) return fail("寫低數量");
+        const item: MaterialItem = {
+          id: uid("mat"),
+          companyId: site.companyId,
+          siteId: site.id,
+          name: input.name.trim(),
+          spec: "",
+          qty: input.qty.trim(),
+          supplier: "",
+          status: "to_order",
+          neededBy: todayISO(),
+          note: `工人叫料：${user.name}${input.note.trim() ? ` · ${input.note.trim()}` : ""}`,
+          updatedAt: nowStamp(),
+        };
+        set({ materials: [item, ...state.materials] });
+        return { ok: true, id: item.id };
+      },
+      confirmMaterial: (id) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user) return fail("請先登入");
+        const item = state.materials.find((row) => row.id === id);
+        if (!item) return fail("搵唔到呢張叫料");
+        const site = state.sites.find((row) => row.id === item.siteId);
+        if (!site || !canSeeSite(user, site)) return fail("你睇唔到呢張單");
+        if (user.role !== "subcontractor") return fail("收貨由叫料嘅工人確認。公司改狀態就得。");
+        if (!item.note.startsWith(`工人叫料：${user.name}`)) return fail("呢張唔係你叫嘅");
+        if (item.status === "delivered") return fail("你已經確認收過");
+        if (item.status !== "ordered") return fail("公司未落單。落咗單、貨到咗先確認。");
+        const stamp = nowStamp();
+        set({
+          materials: state.materials.map((row) =>
+            row.id === id ? { ...row, status: "delivered", note: `${row.note} · ${user.name}確認收到`, updatedAt: stamp } : row,
+          ),
+        });
+        return { ok: true, id };
+      },
+      touchCompany: (companyId, note) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "manage_billing")) return fail("只有平台管理員可以記低跟進");
+        if (!note.trim()) return fail("寫低你點樣跟進");
+        const company = state.companies.find((item) => item.id === companyId);
+        if (!company) return fail("搵唔到公司");
+        const row: PlatformTouch = {
+          id: uid("touch"),
+          companyId,
+          byName: user.name,
+          note: note.trim(),
+          at: nowStamp(),
+        };
+        const audit: Audit = {
+          id: uid("audit"),
+          at: row.at,
+          companyId,
+          byName: user.name,
+          note: `跟進${company.shortName}：${note.trim()}`,
+        };
+        set({ touches: [row, ...state.touches], audits: [audit, ...state.audits] });
+        return { ok: true, id: row.id };
+      },
+      extendTrial: (companyId) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "manage_billing")) return fail("試用日只可以由平台後端改");
+        const company = state.companies.find((item) => item.id === companyId);
+        if (!company) return fail("搵唔到公司");
+        if (company.status !== "trial") return fail("呢間唔係試用。正式客戶請改套餐，唔好當試用加日。");
+        const today = todayISO();
+        const base = company.trialEnds && company.trialEnds > today ? company.trialEnds : today;
+        const trialEnds = addDays(base, 7);
+        const audit: Audit = {
+          id: uid("audit"),
+          at: nowStamp(),
+          companyId,
+          byName: user.name,
+          note: `示範後端將${company.shortName}試用延長到${trialEnds}。資料冇鎖、冇刪。`,
+        };
+        set({
+          companies: state.companies.map((item) => (item.id === companyId ? { ...item, trialEnds, status: "trial" } : item)),
+          audits: [audit, ...state.audits],
+        });
+        return { ok: true };
+      },
+      addCatalogItem: (kind, label) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "view_admin")) return fail("常用選項只可以由平台管理員改");
+        const name = label.trim();
+        if (!name) return fail("寫低選項名");
+        if (name.length > 16) return fail("選項最多十六個字");
+        const base = state.catalog ?? { processes: [], trades: [] };
+        const list = base[kind];
+        if (list.includes(name)) return fail("呢項已經有");
+        if (list.length >= 20) return fail("最多二十項，先刪走唔用嘅");
+        set({ catalog: { ...base, [kind]: [...list, name] } });
+        return { ok: true };
+      },
+      removeCatalogItem: (kind, label) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "view_admin")) return fail("常用選項只可以由平台管理員改");
+        const base = state.catalog ?? { processes: [], trades: [] };
+        const list = base[kind];
+        if (!list.includes(label)) return fail("搵唔到呢項");
+        set({ catalog: { ...base, [kind]: list.filter((item) => item !== label) } });
+        return { ok: true };
+      },
     }),
     {
       name: "deitong-demo-v1",
       skipHydration: true,
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<Store>;
+        return {
+          ...current,
+          ...saved,
+          checkins: saved.checkins ?? current.checkins,
+          nudges: saved.nudges ?? current.nudges,
+          dayCloses: saved.dayCloses ?? current.dayCloses,
+          instructions: saved.instructions ?? current.instructions,
+          touches: saved.touches ?? current.touches,
+          catalog: saved.catalog && Array.isArray(saved.catalog.processes) && Array.isArray(saved.catalog.trades) ? saved.catalog : current.catalog,
+        };
+      },
       partialize: (state) => ({
         companies: state.companies,
         members: state.members,
@@ -449,11 +828,22 @@ export const useAppStore = create<Store>()(
         materials: state.materials,
         files: state.files,
         audits: state.audits,
+        checkins: state.checkins,
+        nudges: state.nudges,
+        dayCloses: state.dayCloses,
+        instructions: state.instructions,
+        touches: state.touches,
+        catalog: state.catalog,
         sessionUserId: state.sessionUserId,
       }),
     },
   ),
 );
+
+function submittedNudges(nudges: Nudge[], siteId: string, date: string, stamp: string, submit: boolean) {
+  if (!submit) return nudges;
+  return nudges.map((row) => (row.siteId === siteId && row.date === date && !row.resolvedAt ? { ...row, resolvedAt: stamp } : row));
+}
 
 function statusLabel(status: CompanyStatus) {
   if (status === "trial") return "試用";
@@ -480,6 +870,11 @@ export function useScope() {
   const materials = useAppStore((s) => s.materials);
   const files = useAppStore((s) => s.files);
   const audits = useAppStore((s) => s.audits);
+  const checkinsAll = useAppStore((s) => s.checkins ?? []);
+  const nudgesAll = useAppStore((s) => s.nudges ?? []);
+  const dayClosesAll = useAppStore((s) => s.dayCloses ?? []);
+  const instructionsAll = useAppStore((s) => s.instructions ?? []);
+  const touchesAll = useAppStore((s) => s.touches ?? []);
   const sessionUserId = useAppStore((s) => s.sessionUserId);
   const hydrated = useAppStore((s) => s._hydrated);
   const user = members.find((m) => m.id === sessionUserId) ?? null;
@@ -488,7 +883,13 @@ export function useScope() {
   const siteById = new Map(sites.map((s) => [s.id, s]));
   const visibleTasks = user ? tasks.filter((t) => canSeeTask(user, t, siteById.get(t.siteId))) : [];
   const siteIds = new Set(visibleSites.map((s) => s.id));
-  const visibleLogs = logs.filter((l) => siteIds.has(l.siteId));
+  const visibleLogs = logs
+    .filter((l) => siteIds.has(l.siteId))
+    .map((l) =>
+      user?.role === "subcontractor"
+        ? { ...l, work: "", deliveries: "", issues: "", headcount: [], photos: [], revisions: [] }
+        : l,
+    );
   const visibleMaterials = materials.filter((m) => siteIds.has(m.siteId));
   const visibleFiles = files.filter((f) => siteIds.has(f.siteId));
   const people = !user
@@ -508,6 +909,11 @@ export function useScope() {
     logs: visibleLogs,
     materials: visibleMaterials,
     files: visibleFiles,
+    checkins: checkinsAll.filter((row) => siteIds.has(row.siteId)),
+    nudges: nudgesAll.filter((row) => siteIds.has(row.siteId)),
+    dayCloses: dayClosesAll.filter((row) => siteIds.has(row.siteId)),
+    instructions: instructionsAll.filter((row) => siteIds.has(row.siteId)),
+    touches: user?.role === "platform_admin" ? touchesAll : touchesAll.filter((row) => row.companyId === user?.companyId),
     people,
     members,
     companies,
