@@ -8,9 +8,12 @@ import {
   MATERIAL_LABEL,
   STATUS_LABEL,
   can,
+  LOG_STATE_LABEL,
   canSeeSite,
   formatDate,
+  logState,
   memberName,
+  todayISO,
   type Task,
 } from "@/lib/site/model";
 import { progressOf, useAppStore, useScope } from "@/lib/site/store";
@@ -164,20 +167,27 @@ export function SiteDetailPage() {
         </Card>
       ) : null}
       {tab === "logs" ? (
-        <div className="space-y-3">
-          {can(user, "create_log", site) ? <Button onClick={() => setLogOpen(true)}>寫今日紀錄</Button> : null}
-          {siteLogs.length === 0 ? <Empty title="未有紀錄" body="呢個盤未有日誌。" /> : null}
-          {siteLogs.map((log) => (
-            <Card key={log.id}>
-              <div className="flex items-center justify-between">
-                <p className="font-medium">{formatDate(log.date)} · {log.weather}</p>
-                <Badge tone={log.status === "draft" ? "gold" : "navy"}>{log.status === "draft" ? "草稿" : "已提交"}</Badge>
-              </div>
-              <p className="mt-2 text-sm">{log.noWork ? "今日無施工" : log.work}</p>
-              <p className="mt-1 text-xs text-muted">填寫人 {log.authorName}</p>
-            </Card>
-          ))}
-        </div>
+        user.role === "subcontractor" ? (
+          <Card className="space-y-2" data-testid="worker-site-log-status">
+            <p className="font-medium">今日{LOG_STATE_LABEL[logState(siteLogs, site.id, todayISO())]}</p>
+            <p className="text-sm text-muted">正式日誌由主管寫。你只睇到今日開唔開工，睇唔到日誌內文。</p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {can(user, "create_log", site) ? <Button data-testid="site-new-log" onClick={() => setLogOpen(true)}>寫今日紀錄</Button> : null}
+            {siteLogs.length === 0 ? <Empty title="未有紀錄" body="呢個盤未有日誌。" /> : null}
+            {siteLogs.map((log) => (
+              <Card key={log.id}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">{formatDate(log.date)} · {log.weather}</p>
+                  <Badge tone={log.status === "draft" ? "gold" : "navy"}>{log.status === "draft" ? "草稿" : "已提交"}</Badge>
+                </div>
+                <p className="mt-2 text-sm">{log.noWork ? "今日無施工" : log.work}</p>
+                <p className="mt-1 text-xs text-muted">填寫人 {log.authorName}</p>
+              </Card>
+            ))}
+          </div>
+        )
       ) : null}
       {tab === "resources" ? (
         <div className="space-y-3">
@@ -232,8 +242,8 @@ export function SiteDetailPage() {
           {siteFiles.length === 0 ? <Empty title="未有檔案" body="圖則同相片會出現喺度。" /> : null}
         </div>
       ) : null}
-      <LogDialog open={logOpen} onOpenChange={setLogOpen} />
-      <TaskDialog open={taskOpen} onOpenChange={setTaskOpen} />
+      <LogDialog open={logOpen} presetSiteId={site.id} onOpenChange={setLogOpen} />
+      <TaskDialog open={taskOpen} presetSiteId={site.id} onOpenChange={setTaskOpen} />
       <TaskDetail task={picked} onClose={() => setPicked(null)} />
     </div>
   );

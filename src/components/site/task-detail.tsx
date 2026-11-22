@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Banner, Button, Field, Modal, Select, TextArea, TextInput } from "@/components/site/ui";
 import {
@@ -22,15 +22,24 @@ export function TaskDetail({ task, onClose }: { task: Task | null; onClose: () =
   const [reason, setReason] = useState("");
   const [assigneeId, setAssigneeId] = useState(task?.assigneeId ?? "");
   const [error, setError] = useState("");
-  const [donePhotos, setDonePhotos] = useState(task?.donePhotos ?? []);
+  const [pendingPhotos, setPendingPhotos] = useState<Task["donePhotos"]>([]);
 
-  function run(result: { ok: boolean; error?: string }) {
+  useEffect(() => {
+    setAssigneeId(task?.assigneeId ?? "");
+    setNote("");
+    setReason("");
+    setError("");
+    setPendingPhotos([]);
+  }, [task?.id, task?.assigneeId]);
+
+  function run(result: { ok: boolean; error?: string; warning?: string }, after?: () => void) {
     if (!result.ok) {
       setError(result.error ?? "儲存唔到");
       return;
     }
     setError("");
-    toast.success("已更新。操作人同時間已留低。");
+    after?.();
+    toast.success(result.warning || "已更新。操作人同時間已留低。");
   }
 
   if (!task || !site || !user) {
@@ -45,6 +54,7 @@ export function TaskDetail({ task, onClose }: { task: Task | null; onClose: () =
     <Modal open onOpenChange={(open) => { if (!open) onClose(); }} title={task.kind === "snag" ? "執漏" : "任務"}>
       <div className="space-y-3 text-sm">
         {error ? <Banner tone="bad">{error}</Banner> : null}
+        {task.needsRework ? <Banner tone="bad">主管退回。改完再交去驗收，張單先算埋口。</Banner> : null}
         <div className="flex flex-wrap gap-2">
           <Badge tone="navy">{STATUS_LABEL[task.status]}</Badge>
           {task.blocked ? <Badge tone="clay">受阻</Badge> : null}
@@ -87,12 +97,13 @@ export function TaskDetail({ task, onClose }: { task: Task | null; onClose: () =
         ) : null}
         <div className="grid grid-cols-2 gap-2">
           {task.status !== "done" && task.status !== "review" ? (
-            <Button type="button" variant="soft" onClick={() => run(actTask(task.id, { type: "start" }))}>開始處理</Button>
+            <Button type="button" variant="soft" data-testid="task-start" onClick={() => run(actTask(task.id, { type: "start" }))}>開始處理</Button>
           ) : null}
           {task.status === "in_progress" || task.status === "pending" ? (
             <Button
               type="button"
-              onClick={() => run(actTask(task.id, { type: "review", donePhotos }))}
+              data-testid="task-review"
+              onClick={() => run(actTask(task.id, { type: "review", donePhotos: pendingPhotos }), () => setPendingPhotos([]))}
             >
               交去驗收
             </Button>
@@ -111,18 +122,18 @@ export function TaskDetail({ task, onClose }: { task: Task | null; onClose: () =
                 const file = e.target.files?.[0];
                 if (!file) return;
                 void fileToPhoto(file).then((photo) => {
-                  setDonePhotos((list) => [...list, photo]);
+                  setPendingPhotos((list) => [...list, photo]);
                   toast.success("完工相已附上，交驗收時會一併儲存。");
                 }).catch((err: unknown) => setError(err instanceof Error ? err.message : "上載唔到"));
               }}
             />
-            {donePhotos.length > task.donePhotos.length ? <p className="text-xs text-muted">新相 {donePhotos.length - task.donePhotos.length} 張，撳交去驗收先會入紀錄。</p> : null}
+            {pendingPhotos.length > 0 ? <p className="text-xs text-muted">新相 {pendingPhotos.length} 張，撳交去驗收先會入紀錄。</p> : null}
           </Field>
         ) : null}
         {canApprove && task.status === "review" ? (
           <Field label="退回修改">
             <TextArea value={note} onChange={(e) => setNote(e.target.value)} placeholder="邊度未得" />
-            <Button type="button" variant="ghost" className="mt-2" onClick={() => run(actTask(task.id, { type: "return", note }))}>退回</Button>
+            <Button type="button" variant="ghost" className="mt-2" data-testid="task-return" onClick={() => run(actTask(task.id, { type: "return", note }), () => setNote(""))}>退回</Button>
           </Field>
         ) : null}
         {task.status !== "done" ? (

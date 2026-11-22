@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Banner, Button, Field, Modal, Select, TextArea, TextInput } from "@/components/site/ui";
 import {
@@ -32,13 +32,17 @@ export function LogDialog({
   open,
   onOpenChange,
   initial,
+  presetSiteId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: DailyLog | null;
+  presetSiteId?: string | null;
 }) {
   const { sites, user } = useScope();
   const saveLog = useAppStore((s) => s.saveLog);
+  const checkins = useAppStore((s) => s.checkins ?? []);
+  const catalog = useAppStore((s) => s.catalog);
   const form = useFormState();
   const [siteId, setSiteId] = useState(initial?.siteId ?? sites[0]?.id ?? "");
   const [date, setDate] = useState(initial?.date ?? todayISO());
@@ -67,6 +71,10 @@ export function LogDialog({
     setHeadcount(next?.headcount.length ? next.headcount : [{ trade: "", count: 1 }]);
     setPhotos(next?.photos ?? []);
   }
+
+  useEffect(() => {
+    if (open && presetSiteId) setSiteId(presetSiteId);
+  }, [open, presetSiteId]);
 
   async function onPhoto(file: File | undefined) {
     if (!file) return;
@@ -164,28 +172,116 @@ export function LogDialog({
           今日無施工
         </label>
         <Field label="當日工作" error={form.fields.work}>
-          <TextArea value={work} disabled={noWork} onChange={(e) => setWork(e.target.value)} placeholder="今日做咗咩、做到邊" />
+          <Select
+            value=""
+            disabled={noWork}
+            data-testid="log-process"
+            onChange={(e) => {
+              const picked = e.target.value;
+              if (!picked) return;
+              setWork((current) => (current.includes(picked) ? current : current.trim() ? `${current.trim()}、${picked}` : picked));
+            }}
+          >
+            <option value="">揀常用工序，可加多項</option>
+            {(catalog?.processes ?? []).map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </Select>
+          <TextArea value={work} disabled={noWork} onChange={(e) => setWork(e.target.value)} placeholder="揀完可以再補一句，或者自己打" />
         </Field>
         <Field label="分判／工種人數">
           <div className="space-y-2">
-            {headcount.map((row, index) => (
-              <div key={index} className="grid grid-cols-[1fr_5rem] gap-2">
-                <TextInput
-                  value={row.trade}
-                  placeholder="例如水電"
-                  onChange={(e) => setHeadcount((list) => list.map((item, i) => (i === index ? { ...item, trade: e.target.value } : item)))}
-                />
-                <TextInput
-                  type="number"
-                  min={0}
-                  value={row.count}
-                  onChange={(e) => setHeadcount((list) => list.map((item, i) => (i === index ? { ...item, count: Number(e.target.value) } : item)))}
-                />
-              </div>
-            ))}
+            {headcount.map((row, index) => {
+              const trades = catalog?.trades ?? [];
+              const custom = row.trade !== "" && !trades.includes(row.trade);
+              return (
+                <div key={index} className="space-y-2">
+                  <div className="grid grid-cols-[1fr_5rem] gap-2">
+                    <Select
+                      value={custom ? "__other" : row.trade}
+                      data-testid={`log-trade-${index}`}
+                      onChange={(e) => {
+                        const picked = e.target.value;
+                        setHeadcount((list) => list.map((item, i) => (i === index ? { ...item, trade: picked === "__other" ? " " : picked } : item)));
+                      }}
+                    >
+                      <option value="">揀工種</option>
+                      {trades.map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                      <option value="__other">其他，自己打</option>
+                    </Select>
+                    <TextInput
+                      type="number"
+                      min={0}
+                      value={row.count}
+                      onChange={(e) => setHeadcount((list) => list.map((item, i) => (i === index ? { ...item, count: Number(e.target.value) } : item)))}
+                    />
+                  </div>
+                  {custom ? (
+                    <TextInput
+                      value={row.trade.trim()}
+                      placeholder="自己打工種"
+                      onChange={(e) => setHeadcount((list) => list.map((item, i) => (i === index ? { ...item, trade: e.target.value || " " } : item)))}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
             <Button type="button" variant="soft" onClick={() => setHeadcount((list) => [...list, { trade: "", count: 1 }])}>
               加一行人數
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                const arrived = checkins.filter((row) => row.siteId === siteId && row.date === date && !row.absent);
+                const map = new Map<string, number>();
+                for (const row of arrived) {
+                  const trade = row.trade || "雜工";
+                  map.set(trade, (map.get(trade) ?? 0) + 1);
+                }
+                const next = [...map.entries()].map(([trade, count]) => ({ trade, count }));
+                if (next.length === 0) {
+                  form.setError("呢個工地今日未有人報到。");
+                  return;
+                }
+                form.setError("");
+                setHeadcount(next);
+                toast.success("已用今日報到人數。交日誌先算數。");
+              }}
+            >
+              用今日報到人數
+            </Button>
+            {(() => {
+              const roster = checkins.filter((row) => row.siteId === siteId && row.date === date);
+              const notes = roster.filter((row) => row.absent || row.note);
+              if (roster.length === 0) return null;
+              return (
+                <div className="rounded-2xl bg-paper-2 p-3 text-sm">
+                  {roster.map((row) => (
+                    <p key={row.id}>{row.absent ? "去唔到" : row.leftAt ? "已走" : "在場"} · {row.memberName}{row.note ? ` · ${row.note}` : ""}</p>
+                  ))}
+                  {notes.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="soft"
+                      className="mt-2"
+                      onClick={() => {
+                        const lines = notes.map((row) => (row.absent ? `${row.memberName}去唔到：${row.note}` : `${row.memberName}收工交帶：${row.note}`));
+                        setIssues((current) => {
+                          const next = lines.filter((line) => !current.includes(line));
+                          return next.length === 0 ? current : current.trim() ? `${current.trim()}\n${next.join("\n")}` : next.join("\n");
+                        });
+                        toast.success("已寫入問題。交日誌先算數。");
+                      }}
+                    >
+                      將去唔到同交帶寫入問題
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
         </Field>
         <Field label="送貨">
@@ -227,16 +323,22 @@ export function TaskDialog({
   open,
   onOpenChange,
   kind = "task",
+  presetSiteId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   kind?: TaskKind;
+  presetSiteId?: string | null;
 }) {
   const { sites, people } = useScope();
   const saveTask = useAppStore((s) => s.saveTask);
   const form = useFormState();
   const [title, setTitle] = useState("");
-  const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
+  const [siteId, setSiteId] = useState(presetSiteId ?? sites[0]?.id ?? "");
+
+  useEffect(() => {
+    if (open) setSiteId(presetSiteId ?? sites[0]?.id ?? "");
+  }, [open, presetSiteId, sites]);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -293,7 +395,7 @@ export function TaskDialog({
       form.setSuccess("");
       return;
     }
-    const message = kind === "snag" ? "問題已開單。資料留喺呢部瀏覽器。" : "任務已開。資料留喺呢部瀏覽器。";
+    const message = result.warning || (kind === "snag" ? "問題已開單。資料留喺呢部瀏覽器。" : "任務已開。資料留喺呢部瀏覽器。");
     toast.success(message);
     form.setSuccess(message);
     form.setError("");
@@ -354,6 +456,9 @@ export function MaterialDialog({ open, onOpenChange, siteId }: { open: boolean; 
   const saveMaterial = useAppStore((s) => s.saveMaterial);
   const form = useFormState();
   const [chosen, setChosen] = useState(siteId ?? sites[0]?.id ?? "");
+  useEffect(() => {
+    if (open) setChosen(siteId ?? sites[0]?.id ?? "");
+  }, [open, siteId, sites]);
   const [name, setName] = useState("");
   const [spec, setSpec] = useState("");
   const [qty, setQty] = useState("");
@@ -505,7 +610,7 @@ export function PersonDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         </Field>
         <Field label="工種"><TextInput value={trade} onChange={(e) => setTrade(e.target.value)} placeholder="水電、木器、油漆" /></Field>
         <Field label="電話"><TextInput value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
-        <Button type="button" onClick={submit}>儲存</Button>
+        <Button type="button" data-testid="person-submit" onClick={submit}>儲存</Button>
       </div>
     </Modal>
   );

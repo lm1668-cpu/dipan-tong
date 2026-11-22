@@ -2,7 +2,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { MaterialDialog, PersonDialog } from "@/components/site/forms";
-import { Badge, Banner, Button, Card, Denied, Empty, Field, NoticeList, ProgressBar, Select } from "@/components/site/ui";
+import { LoopRail, platformLoop } from "@/components/site/loops";
+import { Badge, Banner, Button, Card, Denied, Empty, Field, NoticeList, ProgressBar, Select, TextInput } from "@/components/site/ui";
 import {
   MATERIAL_LABEL,
   PLANS,
@@ -14,6 +15,9 @@ import {
   can,
   formatDate,
   formatWhen,
+  logState,
+  platformAlerts,
+  todayISO,
   type CompanyStatus,
   type FileKind,
   type MaterialStatus,
@@ -59,6 +63,7 @@ export function PeoplePage() {
 export function MaterialsPage() {
   const { user, materials, sites } = useScope();
   const setMaterialStatus = useAppStore((s) => s.setMaterialStatus);
+  const confirmMaterial = useAppStore((s) => s.confirmMaterial);
   const [open, setOpen] = useState(false);
   const canEdit = user ? sites.some((site) => can(user, "edit_material", site)) : false;
   if (!user || user.role === "platform_admin") return <Denied />;
@@ -98,6 +103,12 @@ export function MaterialsPage() {
                 >
                   {(Object.keys(MATERIAL_LABEL) as MaterialStatus[]).map((key) => <option key={key} value={key}>{MATERIAL_LABEL[key]}</option>)}
                 </Select>
+              ) : item.note.startsWith(`工人叫料：${user.name}`) && item.status === "ordered" ? (
+                <Button type="button" variant="soft" onClick={() => {
+                  const result = confirmMaterial(item.id);
+                  if (!result.ok) toast.error(result.error);
+                  else toast.success("已確認收到。呢張叫料埋口。");
+                }}>我收到</Button>
               ) : null}
             </Card>
           );
@@ -218,8 +229,13 @@ function ProgressChart({ data }: { data: { name: string; 進度: number }[] }) {
 }
 
 export function ReportsPage() {
-  const { user, sites, tasks, logs } = useScope();
+  const { user, sites, tasks, logs, checkins } = useScope();
   if (!user || !can(user, "view_reports")) return <Denied />;
+  const today = todayISO();
+  const missing = sites.filter((site) => logState(logs, site.id, today) !== "submitted");
+  const waiting = tasks.filter((task) => task.status === "review");
+  const loose = tasks.filter((task) => task.status === "unassigned");
+  const away = checkins.filter((row) => row.date === today && row.absent);
   const data = sites.map((site) => ({ name: site.district, 進度: progressOf(site) }));
   const byStatus = (Object.keys(STATUS_LABEL) as (keyof typeof STATUS_LABEL)[]).map((key) => ({
     name: STATUS_LABEL[key],
@@ -236,6 +252,12 @@ export function ReportsPage() {
         <Card><p className="text-xs text-muted">未完成</p><p className="font-display text-3xl tabular-nums">{tasks.filter((t) => t.status !== "done").length}</p></Card>
         <Card><p className="text-xs text-muted">日誌</p><p className="font-display text-3xl tabular-nums">{logs.length}</p></Card>
       </div>
+      <Card className="space-y-2">
+        <h2 className="font-display text-xl">今日未埋口</h2>
+        <p className="text-sm">未交日誌 {missing.length} 個盤{missing.length ? `：${missing.map((site) => site.name).join("、")}` : ""}</p>
+        <p className="text-sm">等驗收 {waiting.length} 張 · 未分派 {loose.length} 張</p>
+        <p className="text-sm">{away.length ? `今日去唔到：${away.map((row) => `${row.memberName}（${row.note || "未寫原因"}）`).join("、")}` : "今日未有人話去唔到。"}</p>
+      </Card>
       <Card>
         <h2 className="font-display text-xl">工地進度</h2>
         <ProgressChart data={data} />
@@ -346,19 +368,175 @@ const STATUS_OPTIONS: { id: CompanyStatus; label: string }[] = [
   { id: "past_due", label: "逾期" },
 ];
 
+function CatalogEditor() {
+  const catalog = useAppStore((s) => s.catalog);
+  const addCatalogItem = useAppStore((s) => s.addCatalogItem);
+  const removeCatalogItem = useAppStore((s) => s.removeCatalogItem);
+  const [processName, setProcessName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [error, setError] = useState("");
+
+  function add(kind: "processes" | "trades", label: string, clear: () => void) {
+    const result = addCatalogItem(kind, label);
+    if (!result.ok) setError(result.error ?? "加唔到");
+    else {
+      setError("");
+      clear();
+    }
+  }
+
+  return (
+    <Card className="space-y-4" data-testid="catalog-editor">
+      <div>
+        <h2 className="font-display text-2xl">常用選項</h2>
+        <p className="text-sm text-muted">地盤日誌嘅工序同工種下拉。只得平台可以加減。示範儲喺呢部瀏覽器，未有雲端後台。</p>
+      </div>
+      {error ? <Banner tone="bad">{error}</Banner> : null}
+      <CatalogGroup
+        title="工序"
+        items={catalog?.processes ?? []}
+        value={processName}
+        testId="catalog-process"
+        onChange={setProcessName}
+        onAdd={() => add("processes", processName, () => setProcessName(""))}
+        onRemove={(label) => {
+          const result = removeCatalogItem("processes", label);
+          setError(result.ok ? "" : result.error ?? "刪唔到");
+        }}
+      />
+      <CatalogGroup
+        title="工種"
+        items={catalog?.trades ?? []}
+        value={tradeName}
+        testId="catalog-trade"
+        onChange={setTradeName}
+        onAdd={() => add("trades", tradeName, () => setTradeName(""))}
+        onRemove={(label) => {
+          const result = removeCatalogItem("trades", label);
+          setError(result.ok ? "" : result.error ?? "刪唔到");
+        }}
+      />
+    </Card>
+  );
+}
+
+function CatalogGroup({
+  title,
+  items,
+  value,
+  testId,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  items: string[];
+  value: string;
+  testId: string;
+  onChange: (value: string) => void;
+  onAdd: () => void;
+  onRemove: (label: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="font-medium">{title}</p>
+      <div className="flex flex-wrap gap-2">
+        {items.length === 0 ? <p className="text-sm text-muted">未有選項，主管要自己打。</p> : null}
+        {items.map((item) => (
+          <span key={item} className="inline-flex items-center gap-1 rounded-full bg-paper-2 py-1 pl-3 pr-1 text-sm">
+            {item}
+            <button type="button" className="grid size-8 place-items-center rounded-full text-clay" onClick={() => onRemove(item)} aria-label={`刪除${item}`}>
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <TextInput value={value} placeholder={`加一個${title}`} data-testid={testId} onChange={(e) => onChange(e.target.value)} />
+        <Button type="button" variant="gold" onClick={onAdd}>加入</Button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminPage() {
-  const { user, companies, allSites, members, audits } = useScope();
+  const { user, companies, allSites, members, audits, touches } = useScope();
   const setSubscription = useAppStore((s) => s.setSubscription);
+  const touchCompany = useAppStore((s) => s.touchCompany);
+  const extendTrial = useAppStore((s) => s.extendTrial);
   const [drafts, setDrafts] = useState<Record<string, { plan: PlanId; status: CompanyStatus }>>({});
-  const [message, setMessage] = useState("");
+  const [feedback, setFeedback] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [touch, setTouch] = useState<Record<string, string>>({});
   if (!user || !can(user, "view_admin")) return <Denied />;
+  const queue = companies.flatMap((company) => {
+    const siteCount = allSites.filter((site) => site.companyId === company.id).length;
+    const seats = members.filter((member) => member.companyId === company.id).length;
+    return platformAlerts(company, { sites: siteCount, seats }).map((alert) => ({ company, alert }));
+  });
   return (
     <div className="space-y-4">
       <div>
         <h1 className="font-display text-3xl">客戶公司</h1>
         <p className="text-sm text-muted">平台只管理訂閱。入唔到客人工地日誌。示範數據其實喺同一部瀏覽器，正式環境要後端按公司隔離。</p>
       </div>
-      {message ? <Banner tone="ok">{message}</Banner> : null}
+      {feedback ? <Banner tone={feedback.tone}>{feedback.text}</Banner> : null}
+      <CatalogEditor />
+      <LoopRail
+        kicker="平台一日"
+        steps={platformLoop(
+          queue.map((item) => item.company.id),
+          touches.filter((item) => item.at.slice(0, 10) === todayISO()).map((item) => item.companyId),
+        )}
+      />
+      <Card className="space-y-3" data-testid="admin-queue">
+        <h2 className="font-display text-2xl">今日要跟</h2>
+        <p className="text-sm text-muted">逾期、試用將完、用量去到頂，先聯絡。唔好鎖、唔好刪現有資料。</p>
+        {queue.length === 0 ? <p className="text-sm text-muted">今日冇公司要追。</p> : null}
+        {queue.map((item) => (
+          <div key={`${item.company.id}-${item.alert}`} className="space-y-2 rounded-2xl bg-paper-2 p-3">
+            <p className="font-medium">{item.company.shortName}</p>
+            <p className="text-sm">{item.alert}</p>
+            <TextInput
+              value={touch[item.company.id] ?? ""}
+              placeholder="例如已 WhatsApp 老闆"
+              onChange={(e) => setTouch((all) => ({ ...all, [item.company.id]: e.target.value }))}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="soft"
+                data-testid={`touch-${item.company.id}`}
+                onClick={() => {
+                  const result = touchCompany(item.company.id, touch[item.company.id] ?? "");
+                  if (!result.ok) setFeedback({ tone: "bad", text: result.error });
+                  else {
+                    setFeedback({ tone: "ok", text: `已記低${item.company.shortName}嘅跟進。` });
+                    setTouch((all) => ({ ...all, [item.company.id]: "" }));
+                  }
+                }}
+              >
+                記低已聯絡
+              </Button>
+              {item.company.status === "trial" ? (
+                <Button
+                  type="button"
+                  data-testid={`extend-trial-${item.company.id}`}
+                  onClick={() => {
+                    const result = extendTrial(item.company.id);
+                    setFeedback(
+                      result.ok
+                        ? { tone: "ok", text: `已幫${item.company.shortName}試用加七日。資料保留。` }
+                        : { tone: "bad", text: result.error },
+                    );
+                  }}
+                >
+                  試用加七日
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </Card>
       {companies.map((company) => {
         const siteCount = allSites.filter((s) => s.companyId === company.id).length;
         const seats = members.filter((m) => m.companyId === company.id).length;
@@ -392,8 +570,8 @@ export function AdminPage() {
               data-testid={`save-plan-${company.id}`}
               onClick={() => {
                 const result = setSubscription(company.id, draft.plan, draft.status);
-                if (!result.ok) setMessage(result.error);
-                else setMessage(`已更新${company.shortName}。呢個操作模擬後端，公司頁唔可以自己改。`);
+                if (!result.ok) setFeedback({ tone: "bad", text: result.error });
+                else setFeedback({ tone: "ok", text: `已更新${company.shortName}。呢個操作模擬後端，公司頁唔可以自己改。` });
               }}
             >
               用示範後端更新
