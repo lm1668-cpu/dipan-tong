@@ -41,7 +41,7 @@ export function LogDialog({
 }) {
   const { sites, user } = useScope();
   const saveLog = useAppStore((s) => s.saveLog);
-  const checkins = useAppStore((s) => s.checkins ?? []);
+  const checkins = useAppStore((s) => s.checkins) ?? [];
   const catalog = useAppStore((s) => s.catalog);
   const form = useFormState();
   const [siteId, setSiteId] = useState(initial?.siteId ?? sites[0]?.id ?? "");
@@ -334,11 +334,12 @@ export function TaskDialog({
   const saveTask = useAppStore((s) => s.saveTask);
   const form = useFormState();
   const [title, setTitle] = useState("");
-  const [siteId, setSiteId] = useState(presetSiteId ?? sites[0]?.id ?? "");
+  const firstSiteId = sites[0]?.id ?? "";
+  const [siteId, setSiteId] = useState(presetSiteId ?? firstSiteId);
 
   useEffect(() => {
-    if (open) setSiteId(presetSiteId ?? sites[0]?.id ?? "");
-  }, [open, presetSiteId, sites]);
+    if (open) setSiteId(presetSiteId ?? firstSiteId);
+  }, [open, presetSiteId, firstSiteId]);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -455,10 +456,11 @@ export function MaterialDialog({ open, onOpenChange, siteId }: { open: boolean; 
   const { sites } = useScope();
   const saveMaterial = useAppStore((s) => s.saveMaterial);
   const form = useFormState();
-  const [chosen, setChosen] = useState(siteId ?? sites[0]?.id ?? "");
+  const firstSiteId = sites[0]?.id ?? "";
+  const [chosen, setChosen] = useState(siteId ?? firstSiteId);
   useEffect(() => {
-    if (open) setChosen(siteId ?? sites[0]?.id ?? "");
-  }, [open, siteId, sites]);
+    if (open) setChosen(siteId ?? firstSiteId);
+  }, [open, siteId, firstSiteId]);
   const [name, setName] = useState("");
   const [spec, setSpec] = useState("");
   const [qty, setQty] = useState("");

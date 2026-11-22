@@ -106,9 +106,12 @@ function WorkerLoop() {
   const [note, setNote] = useState("");
   const [aside, setAside] = useState<{ siteId: string; mode: "leave" | "absent" } | null>(null);
   const [asideNote, setAsideNote] = useState("");
+  const siteKey = sites.map((s) => s.id).join(",");
+  const firstSiteId = sites[0]?.id ?? "";
   useEffect(() => {
-    if (!sites.some((s) => s.id === siteId)) setSiteId(sites[0]?.id ?? "");
-  }, [sites, siteId]);
+    const valid = siteKey ? siteKey.split(",") : [];
+    if (!valid.includes(siteId)) setSiteId(firstSiteId);
+  }, [siteKey, firstSiteId, siteId]);
   if (!user) return null;
 
   const openTask = (task: Task) => {
