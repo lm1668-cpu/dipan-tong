@@ -1,14 +1,36 @@
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { DemoBanner, BrandMark, Mark } from "@/components/site/ui";
+import { Banner, BrandMark, Button, Card, DemoBanner, Field, Mark, TextInput } from "@/components/site/ui";
 import { ROLE_LABEL, assetUrl } from "@/lib/site/model";
 import { useAppStore } from "@/lib/site/store";
+import { isFirebaseConfigured } from "@/lib/firebase/config";
+import { cloudSignIn } from "@/lib/firebase/auth";
 
 export function LoginPage() {
   const hydrated = useAppStore((s) => s._hydrated);
   const members = useAppStore((s) => s.members);
   const companies = useAppStore((s) => s.companies);
   const signIn = useAppStore((s) => s.signIn);
+  const enterCloudSession = useAppStore((s) => s.enterCloudSession);
   const navigate = useNavigate();
+  const firebaseReady = isFirebaseConfigured();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [cloudError, setCloudError] = useState("");
+
+  async function onCloudLogin() {
+    setBusy(true);
+    setCloudError("");
+    const res = await cloudSignIn(email, password);
+    setBusy(false);
+    if (!res.ok) {
+      setCloudError(res.error);
+      return;
+    }
+    await enterCloudSession(res.profile);
+    void navigate({ to: res.profile.role === "platform_admin" ? "/app/admin" : "/app" });
+  }
 
   function enter(id: string, role: string) {
     signIn(id);
@@ -37,9 +59,47 @@ export function LoginPage() {
           />
           <figcaption className="bg-navy px-4 py-2.5 text-sm font-bold text-card">一齊出發去裝修 · 由站口行去屋苑</figcaption>
         </figure>
-        <h1 className="mt-6 font-display text-4xl">揀個身份入去。</h1>
+        {firebaseReady ? (
+          <Card className="mt-6 space-y-3" data-testid="cloud-login-card">
+            <div>
+              <h1 className="font-display text-2xl">正式雲端登入（Firebase）</h1>
+              <p className="mt-1 text-sm text-muted">
+                用已登記嘅公司電郵同密碼登入 renocamp-site，登入後資料會經 Firestore 按公司隔離同步。
+              </p>
+            </div>
+            {cloudError ? <Banner tone="bad">{cloudError}</Banner> : null}
+            <Field label="電郵">
+              <TextInput
+                type="email"
+                value={email}
+                data-testid="cloud-email"
+                placeholder="name@company.com"
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field label="密碼">
+              <TextInput
+                type="password"
+                value={password}
+                data-testid="cloud-password"
+                placeholder="輸入密碼"
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="gold"
+              disabled={busy}
+              data-testid="cloud-login-submit"
+              onClick={() => void onCloudLogin()}
+            >
+              {busy ? "登入緊…" : "用 Firebase 登入"}
+            </Button>
+          </Card>
+        ) : null}
+        <h2 className="mt-6 font-display text-3xl">示範身份一鍵試用</h2>
         <p className="mt-2 text-sm text-muted">
-          未有 Firebase 專案，所以呢度唔係真正登入。揀完之後，資料只留喺呢部瀏覽器。換公司就會睇到隔離：裕安睇唔到澄木。
+          下面 8 個一鍵示範身份只存於呢部瀏覽器（唔連雲端），方便隨時試用各角色閉環同隔離效果。
         </p>
         {!hydrated ? <p className="mt-6 text-sm text-muted">身份準備緊…</p> : null}
         {hydrated ? (

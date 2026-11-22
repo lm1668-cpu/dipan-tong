@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 import { DEMO_NOTE, assetUrl } from "@/lib/site/model";
+import { useAppStore } from "@/lib/site/store";
 
 export function buttonClass(variant: "primary" | "gold" | "ghost" | "soft" | "danger" = "primary") {
   return cn(
@@ -56,8 +57,18 @@ export function Mark({ text, size = "md", tone = "navy" }: { text: string; size?
 }
 
 export function DemoBanner() {
+  const authMode = useAppStore((s) => s.authMode);
+  const cloudStatus = useAppStore((s) => s.cloudStatus);
+  const cloudUserEmail = useAppStore((s) => s.cloudUserEmail);
+  if (authMode === "firebase" && cloudStatus === "connected") {
+    return (
+      <p className="bg-navy px-4 py-2 text-center text-xs leading-5 text-gold" data-testid="cloud-banner">
+        已連接 Firebase（renocamp-site）· 雲端帳戶：{cloudUserEmail} · 資料即時同步並按公司隔離
+      </p>
+    );
+  }
   return (
-    <p className="bg-navy px-4 py-2 text-center text-xs leading-5 text-paper">{DEMO_NOTE}</p>
+    <p className="bg-navy px-4 py-2 text-center text-xs leading-5 text-paper" data-testid="demo-banner">{DEMO_NOTE}</p>
   );
 }
 
