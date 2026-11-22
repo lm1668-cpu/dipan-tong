@@ -12,6 +12,7 @@ import {
   ROLE_LABEL,
   SECURITY_NOTE,
   STATUS_LABEL,
+  assetUrl,
   can,
   formatDate,
   formatWhen,
@@ -188,7 +189,7 @@ export function FilesPage() {
           const site = sites.find((s) => s.id === file.siteId);
           return (
             <Card key={file.id}>
-              {file.src ? <img src={file.src} alt={file.name} className="mb-3 h-36 w-full rounded-2xl object-cover" /> : null}
+              {file.src ? <img src={assetUrl(file.src)} alt={file.name} className="mb-3 h-36 w-full rounded-2xl object-cover" /> : null}
               <p className="font-medium">{file.name}</p>
               <p className="text-xs text-muted">{site?.name} · {file.kind === "drawing" ? "圖則" : file.kind === "photo" ? "相片" : "文件"}</p>
               {file.note ? <p className="mt-1 text-sm">{file.note}</p> : null}

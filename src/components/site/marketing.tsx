@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { DemoBanner, BrandMark, buttonClass } from "@/components/site/ui";
-import { PLANS, PLAN_ORDER, PRICE_NOTE } from "@/lib/site/model";
+import { PLANS, PLAN_ORDER, PRICE_NOTE, assetUrl } from "@/lib/site/model";
 import { useAppStore } from "@/lib/site/store";
 import { cn } from "@/lib/utils";
 
@@ -117,7 +117,7 @@ export function MarketingPage() {
         <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <figure className="relative overflow-hidden rounded-3xl shadow-card lg:min-h-80">
           <img
-            src="/photos/crew-depart.jpg"
+            src={assetUrl("/photos/crew-depart.jpg")}
             alt="一班裝修師傅、哥基同貓由地鐵站口一齊行去屋苑開工"
             className="h-64 w-full object-cover object-[center_40%] sm:h-80 lg:absolute lg:inset-0 lg:h-full"
           />

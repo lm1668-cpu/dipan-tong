@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { DemoBanner, BrandMark, Mark } from "@/components/site/ui";
-import { ROLE_LABEL, isOverdue, todayISO } from "@/lib/site/model";
+import { ROLE_LABEL, assetUrl, isOverdue, todayISO } from "@/lib/site/model";
 import { useAppStore, useScope } from "@/lib/site/store";
 import { cn } from "@/lib/utils";
 
@@ -138,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="px-4 pb-3">
               <figure className="overflow-hidden rounded-3xl shadow-card">
                 <img
-                  src="/photos/crew-depart.jpg"
+                  src={assetUrl("/photos/crew-depart.jpg")}
                   alt="一班裝修師傅由站口一齊行去屋苑開工"
                   className="h-28 w-full object-cover object-[center_40%]"
                 />

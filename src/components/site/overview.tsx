@@ -1,8 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { LogDialog, MaterialDialog, TaskDialog } from "@/components/site/forms";
+import { RoleLoop } from "@/components/site/loops";
 import { Badge, Button, Card, NoticeList, ProgressBar } from "@/components/site/ui";
-import { formatDate, isOverdue, todayISO, weekday, can } from "@/lib/site/model";
+import { assetUrl, formatDate, isOverdue, todayISO, weekday, can } from "@/lib/site/model";
 import { progressOf, useAppStore, useScope } from "@/lib/site/store";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ export function OverviewPage() {
         <p className="text-sm font-bold text-muted">{formatDate(today)} 星期{weekday(today)}</p>
         <h1 className="text-3xl">{user.name}，今日有咩要跟？</h1>
       </div>
+      <RoleLoop />
       {user.role !== "subcontractor" ? <NoticeList notes={notices} /> : null}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((stat, index) => (
@@ -76,7 +78,7 @@ export function OverviewPage() {
                 className="overflow-hidden rounded-3xl border border-line bg-card text-left shadow-card"
                 onClick={() => void navigate({ to: "/app/sites/$siteId", params: { siteId: site.id } })}
               >
-                <img src={site.cover} alt="" className="h-32 w-full object-cover" />
+                <img src={assetUrl(site.cover)} alt="" className="h-32 w-full object-cover" />
                 <div className="space-y-2 p-4">
                   <p className="text-xs text-muted">{site.district} · {site.stage}</p>
                   <p className="font-medium">{site.name}</p>
@@ -108,19 +110,21 @@ export function OverviewPage() {
               <Badge tone="gold">今日</Badge>
             </button>
           ))}
-          {drafts.map((log) => (
+          {user.role !== "subcontractor"
+            ? drafts.map((log) => (
             <button key={log.id} type="button" className="flex w-full items-center justify-between rounded-2xl border border-line bg-card px-4 py-3 text-left" onClick={() => { setFocusLog(log.id); void navigate({ to: "/app/logs" }); }}>
               <span className="text-sm">日誌草稿未提交</span>
               <Badge>草稿</Badge>
             </button>
-          ))}
+          ))
+            : null}
           {matSoon.map((item) => (
             <button key={item.id} type="button" className="flex w-full items-center justify-between rounded-2xl border border-line bg-card px-4 py-3 text-left" onClick={() => void navigate({ to: "/app/materials" })}>
               <span className="text-sm">{item.name}要跟</span>
               <Badge tone={item.status === "issue" ? "clay" : "gold"}>{item.status === "issue" ? "有問題" : "快要用"}</Badge>
             </button>
           ))}
-          {overdue.length + todayTasks.length + drafts.length + matSoon.length === 0 ? (
+          {overdue.length + todayTasks.length + (user.role === "subcontractor" ? 0 : drafts.length) + matSoon.length === 0 ? (
             <p className="text-sm text-muted">今日冇趕住要跟嘅單。收得工就收工。</p>
           ) : null}
         </div>

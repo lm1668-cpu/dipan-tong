@@ -4,6 +4,7 @@ import { Badge, Banner, Button, Field, Modal, Select, TextArea, TextInput } from
 import {
   PRIORITY_LABEL,
   STATUS_LABEL,
+  assetUrl,
   can,
   formatDate,
   formatWhen,
@@ -71,7 +72,7 @@ export function TaskDetail({ task, onClose }: { task: Task | null; onClose: () =
         {task.photos.length + task.donePhotos.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">
             {[...task.photos, ...task.donePhotos].map((photo) => (
-              <img key={photo.id} src={photo.src} alt={photo.caption} className="aspect-square w-full rounded-2xl object-cover" />
+              <img key={photo.id} src={assetUrl(photo.src)} alt={photo.caption} className="aspect-square w-full rounded-2xl object-cover" />
             ))}
           </div>
         ) : null}

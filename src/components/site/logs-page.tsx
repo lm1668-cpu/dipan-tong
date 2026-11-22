@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { LogDialog } from "@/components/site/forms";
 import { Badge, Button, Card, Denied, Empty } from "@/components/site/ui";
-import { can, formatDate, formatWhen, type DailyLog } from "@/lib/site/model";
+import { assetUrl, can, formatDate, formatWhen, logState, LOG_STATE_LABEL, todayISO, weekday, type DailyLog } from "@/lib/site/model";
 import { useAppStore, useScope } from "@/lib/site/store";
 
 export function LogsPage() {
@@ -24,6 +24,24 @@ export function LogsPage() {
 
   if (!user || user.role === "platform_admin") return <Denied />;
 
+  if (user.role === "subcontractor") {
+    const today = todayISO();
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="font-display text-3xl">每日紀錄</h1>
+          <p className="text-sm text-muted">正式日誌由主管寫。你只睇到今日開唔開工，睇唔到成份紀錄。</p>
+        </div>
+        {sites.map((site) => (
+          <Card key={site.id}>
+            <p className="font-medium">{site.name}</p>
+            <p className="text-sm text-muted">今日{LOG_STATE_LABEL[logState(logs, site.id, today)]}</p>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3">
@@ -42,7 +60,7 @@ export function LogsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs text-muted">{site?.name}</p>
-                  <p className="font-medium">{formatDate(log.date)} 星期 · {log.weather}</p>
+                  <p className="font-medium">{formatDate(log.date)} 星期{weekday(log.date)} · {log.weather}</p>
                 </div>
                 <Badge tone={log.status === "draft" ? "gold" : "navy"}>{log.status === "draft" ? "草稿" : "已提交"}</Badge>
               </div>
@@ -58,7 +76,7 @@ export function LogsPage() {
               ))}
               {log.photos.length > 0 ? (
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  {log.photos.map((photo) => <img key={photo.id} src={photo.src} alt={photo.caption} className="aspect-square rounded-2xl object-cover" />)}
+                  {log.photos.map((photo) => <img key={photo.id} src={assetUrl(photo.src)} alt={photo.caption} className="aspect-square rounded-2xl object-cover" />)}
                 </div>
               ) : null}
               {canWrite ? (

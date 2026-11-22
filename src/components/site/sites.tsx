@@ -9,6 +9,7 @@ import {
   STATUS_LABEL,
   can,
   LOG_STATE_LABEL,
+  assetUrl,
   canSeeSite,
   formatDate,
   logState,
@@ -58,7 +59,7 @@ export function SitesPage() {
             className="overflow-hidden rounded-3xl border border-line bg-card text-left shadow-card"
             onClick={() => void navigate({ to: "/app/sites/$siteId", params: { siteId: site.id } })}
           >
-            <img src={site.cover} alt={`${site.name}現場`} className="h-40 w-full object-cover" />
+            <img src={assetUrl(site.cover)} alt={`${site.name}現場`} className="h-40 w-full object-cover" />
             <div className="space-y-2 p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted">{site.district}</p>
@@ -102,7 +103,7 @@ export function SiteDetailPage() {
 
   return (
     <div className="space-y-4">
-      <img src={site.cover} alt="" className="h-44 w-full rounded-3xl object-cover" />
+      <img src={assetUrl(site.cover)} alt="" className="h-44 w-full rounded-3xl object-cover" />
       <div>
         <p className="text-sm text-muted">{site.district} · {site.stage}</p>
         <h1 className="font-display text-3xl">{site.name}</h1>
@@ -234,7 +235,7 @@ export function SiteDetailPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {siteFiles.map((file) => (
             <Card key={file.id}>
-              {file.src ? <img src={file.src} alt={file.name} className="mb-3 h-32 w-full rounded-2xl object-cover" /> : null}
+              {file.src ? <img src={assetUrl(file.src)} alt={file.name} className="mb-3 h-32 w-full rounded-2xl object-cover" /> : null}
               <p className="font-medium">{file.name}</p>
               <p className="text-xs text-muted">{file.kind === "drawing" ? "圖則" : file.kind === "photo" ? "相片" : "文件"} · {file.note}</p>
             </Card>

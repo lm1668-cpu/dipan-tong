@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { DemoBanner, BrandMark, Mark } from "@/components/site/ui";
-import { ROLE_LABEL } from "@/lib/site/model";
+import { ROLE_LABEL, assetUrl } from "@/lib/site/model";
 import { useAppStore } from "@/lib/site/store";
 
 export function LoginPage() {
@@ -31,7 +31,7 @@ export function LoginPage() {
         </Link>
         <figure className="mt-5 overflow-hidden rounded-3xl shadow-card">
           <img
-            src="/photos/crew-depart.jpg"
+            src={assetUrl("/photos/crew-depart.jpg")}
             alt="一班裝修師傅由站口一齊行去屋苑開工"
             className="h-44 w-full object-cover object-[center_40%]"
           />

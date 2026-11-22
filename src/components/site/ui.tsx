@@ -2,7 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
-import { DEMO_NOTE } from "@/lib/site/model";
+import { DEMO_NOTE, assetUrl } from "@/lib/site/model";
 
 export function buttonClass(variant: "primary" | "gold" | "ghost" | "soft" | "danger" = "primary") {
   return cn(
@@ -33,7 +33,7 @@ export function BrandMark({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
         size === "sm" && "size-9",
       )}
     >
-      <img src="/photos/mascot.jpg" alt="" className="size-full scale-105 object-cover" />
+      <img src={assetUrl("/photos/mascot.jpg")} alt="" className="size-full scale-105 object-cover" />
     </span>
   );
 }
