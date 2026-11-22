@@ -36,6 +36,7 @@ export interface Member {
   phone: string;
   trade: string | null;
   blurb: string;
+  disabled?: boolean;
 }
 
 export interface TradeProgress {
@@ -222,6 +223,33 @@ export const DEFAULT_CATALOG: OptionCatalog = {
   trades: ["泥水", "水電", "木器", "油漆", "雜工"],
 };
 
+export interface FeatureFlags {
+  logs: boolean;
+  tasks: boolean;
+  materials: boolean;
+  files: boolean;
+  reports: boolean;
+  billing: boolean;
+}
+
+export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
+  logs: true,
+  tasks: true,
+  materials: true,
+  files: true,
+  reports: true,
+  billing: true,
+};
+
+export const FEATURE_LABELS: Record<keyof FeatureFlags, { label: string; hint: string }> = {
+  logs: { label: "每日紀錄／日誌", hint: "開關公司日誌與工人今日開工狀態入口" },
+  tasks: { label: "任務／執漏", hint: "開關任務分派、完工相與退回驗收模組" },
+  materials: { label: "材料跟進", hint: "開關工人叫料、落單與確認收貨流程" },
+  files: { label: "文件／相片", hint: "開關圖則同現場相片紀錄入口" },
+  reports: { label: "報表", hint: "開關今日未埋口同工地進度圖表" },
+  billing: { label: "套餐展示頁", hint: "開關公司端睇套餐與用量提示入口" },
+};
+
 export interface DemoData {
   companies: Company[];
   members: Member[];
@@ -237,6 +265,7 @@ export interface DemoData {
   instructions: Instruction[];
   touches: PlatformTouch[];
   catalog: OptionCatalog;
+  featureFlags: FeatureFlags;
 }
 
 export const DEMO_NOTE =

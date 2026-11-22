@@ -24,7 +24,9 @@ import {
   type DailyLog,
   type DayClose,
   type DemoData,
+  DEFAULT_FEATURE_FLAGS,
   type DocFile,
+  type FeatureFlags,
   type Instruction,
   type LogInput,
   type MaterialInput,
@@ -85,6 +87,9 @@ interface Store extends DemoData {
   extendTrial: (companyId: string) => MutResult;
   addCatalogItem: (kind: keyof OptionCatalog, label: string) => MutResult;
   removeCatalogItem: (kind: keyof OptionCatalog, label: string) => MutResult;
+  setFeatureFlag: (key: keyof FeatureFlags, enabled: boolean) => MutResult;
+  adminAddMember: (input: { name: string; companyId: string | null; role: Role; trade: string; phone: string }) => MutResult;
+  adminUpdateMember: (memberId: string, patch: { role?: Role; disabled?: boolean }) => MutResult;
 }
 
 function currentUser(state: DemoData & { sessionUserId: string | null }) {
@@ -802,6 +807,71 @@ export const useAppStore = create<Store>()(
         set({ catalog: { ...base, [kind]: list.filter((item) => item !== label) } });
         return { ok: true };
       },
+      setFeatureFlag: (key, enabled) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "view_admin")) return fail("功能開關只可以由超級管理員改");
+        const current = state.featureFlags ?? DEFAULT_FEATURE_FLAGS;
+        set({ featureFlags: { ...current, [key]: enabled } });
+        return { ok: true };
+      },
+      adminAddMember: (input) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "view_admin")) return fail("只有超級管理員可以跨公司加成員");
+        if (!input.name.trim()) return fail("請填姓名");
+        if (input.role !== "platform_admin" && !input.companyId) return fail("公司成員必須揀所屬公司");
+        if (input.role === "subcontractor" && !input.trade.trim()) return fail("分判請填工種");
+        const company = input.companyId ? state.companies.find((c) => c.id === input.companyId) : null;
+        if (input.role !== "platform_admin" && !company) return fail("搵唔到所屬公司");
+        const seats = company ? state.members.filter((m) => m.companyId === company.id).length : 0;
+        const member: Member = {
+          id: uid("user"),
+          companyId: input.role === "platform_admin" ? null : company?.id ?? null,
+          name: input.name.trim(),
+          role: input.role,
+          title:
+            input.role === "platform_admin"
+              ? "平台管理員"
+              : input.role === "company_admin"
+                ? "公司管理員"
+                : input.role === "project_manager"
+                  ? "項目經理"
+                  : input.role === "site_supervisor"
+                    ? "工地主管"
+                    : `${input.trade.trim()}分判`,
+          phone: input.phone.trim() || "未填",
+          trade: input.role === "subcontractor" ? input.trade.trim() : null,
+          blurb: "由超級管理員加入嘅示範帳戶。",
+          disabled: false,
+        };
+        set({ members: [...state.members, member] });
+        const warning =
+          company && seats + 1 >= PLANS[company.plan].seats
+            ? "該公司正式帳戶已到套餐建議上限。新帳戶已保留，唔會停用現有帳戶。"
+            : undefined;
+        return { ok: true, id: member.id, warning };
+      },
+      adminUpdateMember: (memberId, patch) => {
+        const state = get();
+        const user = currentUser(state);
+        if (!user || !can(user, "view_admin")) return fail("只有超級管理員可以管理全平台成員");
+        if (memberId === user.id) return fail("唔可以修改或停用目前登入緊嘅自己");
+        const target = state.members.find((m) => m.id === memberId);
+        if (!target) return fail("搵唔到呢位成員");
+        set({
+          members: state.members.map((m) =>
+            m.id === memberId
+              ? {
+                  ...m,
+                  role: patch.role ?? m.role,
+                  disabled: patch.disabled ?? m.disabled,
+                }
+              : m,
+          ),
+        });
+        return { ok: true, id: memberId };
+      },
     }),
     {
       name: "deitong-demo-v1",
@@ -817,6 +887,7 @@ export const useAppStore = create<Store>()(
           instructions: saved.instructions ?? current.instructions,
           touches: saved.touches ?? current.touches,
           catalog: saved.catalog && Array.isArray(saved.catalog.processes) && Array.isArray(saved.catalog.trades) ? saved.catalog : current.catalog,
+          featureFlags: { ...DEFAULT_FEATURE_FLAGS, ...(saved.featureFlags ?? {}) },
         };
       },
       partialize: (state) => ({
@@ -834,6 +905,7 @@ export const useAppStore = create<Store>()(
         instructions: state.instructions,
         touches: state.touches,
         catalog: state.catalog,
+        featureFlags: state.featureFlags,
         sessionUserId: state.sessionUserId,
       }),
     },

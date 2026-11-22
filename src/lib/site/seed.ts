@@ -1,4 +1,4 @@
-import { atOffset, isoOffset, type DemoData } from "@/lib/site/model";
+import { atOffset, DEFAULT_CATALOG, DEFAULT_FEATURE_FLAGS, isoOffset, type DemoData } from "@/lib/site/model";
 
 export function createDemoData(): DemoData {
   const companies: DemoData["companies"] = [
@@ -85,7 +85,7 @@ export function createDemoData(): DemoData {
       title: "水電分判",
       phone: "9567 4419",
       trade: "水電",
-      blurb: "只睇派咗畀你嘅工作，睇唔到成間公司。",
+      blurb: "裝修工人／水電分判。只睇派咗畀你嘅工作，睇唔到成間公司。",
     },
     {
       id: "u-y-wood",
@@ -95,7 +95,7 @@ export function createDemoData(): DemoData {
       title: "木器分判",
       phone: "9678 1184",
       trade: "木器",
-      blurb: "只睇木器相關、派咗畀你嘅單。",
+      blurb: "裝修工人／木器分判。只睇派咗畀你嘅單。",
     },
     {
       id: "u-c-admin",
@@ -431,10 +431,14 @@ export function createDemoData(): DemoData {
       subId: "u-y-elec",
       priority: "high",
       due: isoOffset(3),
-      status: "pending",
+      status: "in_progress",
       blocked: false,
       blockReason: "",
-      activity: [{ at: atOffset(-1, "11:00"), byName: "張偉強", action: "派畀梁強" }],
+      needsRework: true,
+      activity: [
+        { at: atOffset(-1, "11:00"), byName: "張偉強", action: "派畀梁強" },
+        { at: atOffset(0, "08:20"), byName: "張偉強", action: "退回修改：閉水未夠二十四小時就影相，請再試水" },
+      ],
       updatedAt: atOffset(-1, "11:00"),
     },
     {
@@ -765,5 +769,33 @@ export function createDemoData(): DemoData {
     },
   ];
 
-  return { companies, members, sites, logs, tasks, materials, files, audits };
+  const checkins: DemoData["checkins"] = [];
+  const dayCloses: DemoData["dayCloses"] = [];
+  const touches: DemoData["touches"] = [];
+  const nudges: DemoData["nudges"] = [
+    {
+      id: "n-office",
+      companyId: "co-yuean",
+      siteId: "s-office",
+      date: isoOffset(0),
+      byName: "黃麗萍",
+      note: "寫字樓今日未見日誌。收工前記低玻璃覆尺結果。",
+      at: atOffset(0, "08:40"),
+      resolvedAt: null,
+    },
+  ];
+  const instructions: DemoData["instructions"] = [
+    {
+      id: "ins-sea",
+      companyId: "co-yuean",
+      siteId: "s-sea",
+      byName: "李俊傑",
+      text: "大廳木作今晚清走木糠，聽日油漆師傅入嚟。",
+      at: atOffset(0, "08:10"),
+      ackByName: null,
+      ackAt: null,
+    },
+  ];
+
+  return { companies, members, sites, logs, tasks, materials, files, audits, checkins, nudges, dayCloses, instructions, touches, catalog: DEFAULT_CATALOG, featureFlags: { ...DEFAULT_FEATURE_FLAGS } };
 }
