@@ -119,6 +119,7 @@ export interface Task {
   status: TaskStatus;
   blocked: boolean;
   blockReason: string;
+  needsRework?: boolean;
   activity: Activity[];
   updatedAt: string;
 }
@@ -148,6 +149,61 @@ export interface DocFile {
   updatedAt: string;
 }
 
+export interface PlatformTouch {
+  id: string;
+  companyId: string;
+  byName: string;
+  note: string;
+  at: string;
+}
+
+export interface CheckIn {
+  id: string;
+  companyId: string;
+  siteId: string;
+  memberId: string;
+  memberName: string;
+  trade: string;
+  date: string;
+  arrivedAt: string;
+  leftAt: string | null;
+  note: string;
+  absent?: boolean;
+}
+
+export interface Nudge {
+  id: string;
+  companyId: string;
+  siteId: string;
+  date: string;
+  byName: string;
+  note: string;
+  at: string;
+  resolvedAt: string | null;
+}
+
+export interface DayClose {
+  id: string;
+  companyId: string;
+  siteId: string;
+  date: string;
+  byName: string;
+  note: string;
+  at: string;
+  openReviews: number;
+}
+
+export interface Instruction {
+  id: string;
+  companyId: string;
+  siteId: string;
+  byName: string;
+  text: string;
+  at: string;
+  ackByName: string | null;
+  ackAt: string | null;
+}
+
 export interface Audit {
   id: string;
   at: string;
@@ -155,6 +211,16 @@ export interface Audit {
   byName: string;
   note: string;
 }
+
+export interface OptionCatalog {
+  processes: string[];
+  trades: string[];
+}
+
+export const DEFAULT_CATALOG: OptionCatalog = {
+  processes: ["泥水批盪", "水電拉線", "木器安裝", "鋪磚", "油漆"],
+  trades: ["泥水", "水電", "木器", "油漆", "雜工"],
+};
 
 export interface DemoData {
   companies: Company[];
@@ -165,6 +231,12 @@ export interface DemoData {
   materials: MaterialItem[];
   files: DocFile[];
   audits: Audit[];
+  checkins: CheckIn[];
+  nudges: Nudge[];
+  dayCloses: DayClose[];
+  instructions: Instruction[];
+  touches: PlatformTouch[];
+  catalog: OptionCatalog;
 }
 
 export const DEMO_NOTE =
@@ -219,7 +291,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   company_admin: "公司管理員",
   project_manager: "項目經理",
   site_supervisor: "工地主管",
-  subcontractor: "分判",
+  subcontractor: "分判／工人",
 };
 
 export const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -247,6 +319,48 @@ export const MATERIAL_LABEL: Record<MaterialStatus, string> = {
 export const WEATHERS = ["天晴", "陰天", "落雨", "驟雨", "酷熱"] as const;
 
 export const PLAN_ORDER: PlanId[] = ["starter", "team", "company"];
+
+export function addDays(iso: string, days: number) {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const dt = new Date(y || 2000, (m || 1) - 1, d || 1);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+export function logState(logs: DailyLog[], siteId: string, date: string): "none" | "draft" | "submitted" {
+  const rows = logs.filter((log) => log.siteId === siteId && log.date === date);
+  if (rows.some((log) => log.status === "submitted")) return "submitted";
+  if (rows.some((log) => log.status === "draft")) return "draft";
+  return "none";
+}
+
+export const LOG_STATE_LABEL = {
+  none: "未寫",
+  draft: "草稿未交",
+  submitted: "已交",
+} as const;
+
+export function platformAlerts(
+  company: Company,
+  counts: { sites: number; seats: number },
+  today = todayISO(),
+) {
+  const plan = PLANS[company.plan];
+  const alerts: string[] = [];
+  if (company.status === "past_due") alerts.push("付款逾期。先聯絡，唔好鎖走佢哋嘅資料。");
+  if (company.status === "trial") {
+    if (!company.trialEnds) alerts.push("試用未寫完結日。");
+    else if (company.trialEnds < today) alerts.push("試用已過。問佢開唔開正式，而家嘅資料保留。");
+    else if (company.trialEnds <= addDays(today, 14)) alerts.push(`試用到 ${formatDate(company.trialEnds)}。`);
+  }
+  if (counts.sites >= plan.sites) alerts.push("工地去到建議上限。");
+  if (counts.seats >= plan.seats) alerts.push("帳戶去到建議上限。");
+  if (company.storageUsedGb >= plan.gb * 0.8) alerts.push(`儲存約 ${company.storageUsedGb}/${plan.gb} GB，去到八成。提醒就得，唔好刪相。`);
+  return alerts;
+}
 
 export function todayISO() {
   const d = new Date();
@@ -330,7 +444,12 @@ export type Action =
   | "view_billing"
   | "manage_billing"
   | "view_admin"
-  | "view_people";
+  | "view_people"
+  | "request_material"
+  | "check_in"
+  | "nudge_log"
+  | "instruct"
+  | "close_day";
 
 /**
  * 示範模式嘅權限表。正式環境必須由後端再做一次，
@@ -367,7 +486,14 @@ export function can(user: Member, action: Action, site?: Site): boolean {
       return role === "company_admin" || role === "project_manager" || role === "site_supervisor";
     case "create_task":
     case "update_task":
+    case "request_material":
+    case "check_in":
       return true;
+    case "nudge_log":
+    case "instruct":
+      return role === "company_admin" || role === "project_manager";
+    case "close_day":
+      return role === "company_admin" || role === "project_manager" || role === "site_supervisor";
     default:
       return false;
   }
@@ -485,3 +611,9 @@ export type TaskCommand =
   | { type: "unblock" };
 
 export type MutResult = { ok: true; id?: string; warning?: string } | { ok: false; error: string };
+
+export function assetUrl(path: string) {
+  if (!path.startsWith("/")) return path;
+  const base = (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL || "/";
+  return base === "/" ? path : `${base.replace(/\/$/, "")}${path}`;
+}
