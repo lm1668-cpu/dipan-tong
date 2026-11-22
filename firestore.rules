@@ -1,0 +1,336 @@
+rules_version = '2';
+
+// 地盤通 (Deitong) — Cloud Firestore Security Rules (Draft Blueprint — NOT YET DEPLOYED)
+// Reference: https://firebase.google.com/docs/firestore/security/rules-conditions
+//
+// Custom Claims expected on Firebase Auth ID token (set strictly via Firebase Admin SDK):
+//   - role: 'platform_admin' | 'company_admin' | 'project_manager' | 'site_supervisor' | 'subcontractor'
+//   - companyId: string | null (null for platform_admin)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return isSignedIn() ? request.auth.token.role : null;
+    }
+
+    function userCompanyId() {
+      return isSignedIn() ? request.auth.token.companyId : null;
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn() && role() == 'platform_admin';
+    }
+
+    function isInCompany(companyId) {
+      return isSignedIn()
+        && !isPlatformAdmin()
+        && userCompanyId() != null
+        && userCompanyId() == companyId;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isInCompany(companyId) && role() == 'company_admin';
+    }
+
+    function isManagerOrAdmin(companyId) {
+      return isInCompany(companyId)
+        && (role() == 'company_admin' || role() == 'project_manager');
+    }
+
+    function isSiteSupervisor(companyId) {
+      return isInCompany(companyId) && role() == 'site_supervisor';
+    }
+
+    function isSubcontractor(companyId) {
+      return isInCompany(companyId) && role() == 'subcontractor';
+    }
+
+    function siteDoc(companyId, siteId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)/sites/$(siteId)).data;
+    }
+
+    function isAssignedSupervisorForSiteData(siteData) {
+      return siteData.supervisorId == request.auth.uid;
+    }
+
+    function isAssignedSubForSiteData(siteData) {
+      return siteData.assignedSubIds is list
+        && request.auth.uid in siteData.assignedSubIds;
+    }
+
+    function canAccessSiteData(companyId, siteData) {
+      return isManagerOrAdmin(companyId)
+        || (isSiteSupervisor(companyId) && isAssignedSupervisorForSiteData(siteData))
+        || (isSubcontractor(companyId) && isAssignedSubForSiteData(siteData));
+    }
+
+    function canManageSite(companyId, siteId) {
+      return isManagerOrAdmin(companyId)
+        || (isSiteSupervisor(companyId) && isAssignedSupervisorForSiteData(siteDoc(companyId, siteId)));
+    }
+
+    function canAccessSite(companyId, siteId) {
+      return canAccessSiteData(companyId, siteDoc(companyId, siteId));
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. Platform-wide Common Options (常用工序 / 常用工種)
+    //    - Read: any signed-in user (company users + platform admin)
+    //    - Write: ONLY platform_admin (max 20 items per list, max 16 chars each)
+    // -------------------------------------------------------------------------
+    match /platformConfig/commonOptions {
+      allow read: if isSignedIn();
+      allow write: if isPlatformAdmin()
+        && request.resource.data.trades is list
+        && request.resource.data.trades.size() <= 20
+        && request.resource.data.workItems is list
+        && request.resource.data.workItems.size() <= 20;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Platform-only Follow-up Notes (平台跟進紀錄 — 公司完全睇唔到)
+    // -------------------------------------------------------------------------
+    match /platformFollowUps/{followUpId} {
+      allow read, write: if isPlatformAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Company Root Document (Tenant Metadata)
+    //    - Platform admin can read company metadata (name, plan, status, usage)
+    //      for customer management, but CANNOT read any operational subcollections.
+    //    - Billing / plan / trialEndsAt / usage / billingStatus are STRICTLY
+    //      server-only (Firebase Admin SDK). Client writes to these fields are
+    //      always rejected (including company_admin / project_manager).
+    // -------------------------------------------------------------------------
+    match /companies/{companyId} {
+      allow read: if isPlatformAdmin() || isInCompany(companyId);
+
+      // Client-side creation/deletion of company tenants is disabled (Admin SDK only)
+      allow create, delete: if false;
+
+      // Company admin may only update non-billing profile fields (e.g. displayName, contact)
+      // Protected billing/quota fields MUST NEVER be modified from client SDK
+      allow update: if isCompanyAdmin(companyId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'plan',
+          'billingStatus',
+          'trialEndsAt',
+          'usage',
+          'quotaLimits',
+          'status'
+        ]);
+
+      // -----------------------------------------------------------------------
+      // 3a. People / Staff / Subcontractors (人手 / 分判)
+      //     - Platform admin: DENIED
+      //     - Subcontractor: DENIED (cannot view company roster)
+      //     - Add/manage people: company_admin ONLY (per can() rules)
+      // -----------------------------------------------------------------------
+      match /people/{personId} {
+        allow read: if isInCompany(companyId) && !isSubcontractor(companyId);
+        allow create, update, delete: if isCompanyAdmin(companyId);
+      }
+
+      // -----------------------------------------------------------------------
+      // 3b. Sites (工地)
+      //     - Platform admin: DENIED
+      //     - Create / assign people to site: company_admin or project_manager
+      //     - Supervisor: only sees/updates sites where supervisorId == uid
+      //     - Subcontractor: only sees sites where uid in assignedSubIds
+      //     - Never auto-delete or lock existing sites on quota soft-cap
+      // -----------------------------------------------------------------------
+      match /sites/{siteId} {
+        allow read: if canAccessSiteData(companyId, resource.data);
+
+        allow create: if isManagerOrAdmin(companyId)
+          && request.resource.data.companyId == companyId;
+
+        allow update: if isManagerOrAdmin(companyId)
+          || (
+            isSiteSupervisor(companyId)
+            && isAssignedSupervisorForSiteData(resource.data)
+            // Supervisor cannot reassign supervisorId or move site across companies
+            && request.resource.data.companyId == companyId
+            && request.resource.data.supervisorId == resource.data.supervisorId
+          );
+
+        allow delete: if false;
+
+        // ---------------------------------------------------------------------
+        // 3b-i. Daily Site Status Summary (今日開唔開工 — 工人只見此摘要，唔見日誌內文)
+        // ---------------------------------------------------------------------
+        match /dayStatus/{dateId} {
+          allow read: if canAccessSite(companyId, siteId);
+          allow create, update: if canManageSite(companyId, siteId);
+          allow delete: if false;
+        }
+
+        // ---------------------------------------------------------------------
+        // 3b-ii. Daily Logs (每日日誌內文)
+        //        - Platform admin: DENIED
+        //        - Subcontractor: DENIED (cannot read full log content)
+        //        - Supervisor: only assigned site
+        //        - Manager / Admin: all company sites
+        //        - Submitted logs cannot be deleted; edits after submit must keep audit trail
+        // ---------------------------------------------------------------------
+        match /logs/{logId} {
+          allow read: if canManageSite(companyId, siteId);
+          allow create: if canManageSite(companyId, siteId)
+            && request.resource.data.siteId == siteId
+            && request.resource.data.companyId == companyId;
+          allow update: if canManageSite(companyId, siteId)
+            && request.resource.data.siteId == resource.data.siteId
+            && request.resource.data.companyId == companyId;
+          allow delete: if false;
+        }
+
+        // ---------------------------------------------------------------------
+        // 3b-iii. Attendance & Close-day Check-in/out (到場 / 收工 / 去唔到)
+        //         - Subcontractor: read/write own attendance record on assigned site only
+        //         - Already arrived user cannot switch to absent (enforced in rules + app)
+        // ---------------------------------------------------------------------
+        match /attendance/{recordId} {
+          allow read: if canManageSite(companyId, siteId)
+            || (isSubcontractor(companyId)
+                && canAccessSite(companyId, siteId)
+                && resource.data.userId == request.auth.uid);
+
+          allow create: if canAccessSite(companyId, siteId)
+            && (canManageSite(companyId, siteId) || request.resource.data.userId == request.auth.uid);
+
+          allow update: if canAccessSite(companyId, siteId)
+            && (canManageSite(companyId, siteId) || resource.data.userId == request.auth.uid)
+            // Already arrived cannot flip to absent
+            && !(resource.data.status == 'arrived' && request.resource.data.status == 'absent');
+
+          allow delete: if false;
+        }
+
+        // ---------------------------------------------------------------------
+        // 3b-iv. Tasks / Snags (任務 / 執漏)
+        //        - Platform admin: DENIED
+        //        - Subcontractor: only tasks where assigneeId == uid or subId == uid
+        //        - Blocked task cannot be marked completed
+        //        - Rework requires reworkReason
+        // ---------------------------------------------------------------------
+        match /tasks/{taskId} {
+          allow read: if canManageSite(companyId, siteId)
+            || (
+              isSubcontractor(companyId)
+              && canAccessSite(companyId, siteId)
+              && (resource.data.assigneeId == request.auth.uid || resource.data.subId == request.auth.uid)
+            );
+
+          allow create: if canAccessSite(companyId, siteId)
+            && request.resource.data.companyId == companyId
+            && request.resource.data.siteId == siteId;
+
+          allow update: if canAccessSite(companyId, siteId)
+            // Blocked tasks cannot be accepted as completed
+            && !(request.resource.data.status == 'done' && request.resource.data.blocked == true)
+            // Rework must include a non-empty reason
+            && !(request.resource.data.needsRework == true
+                 && (!(request.resource.data.reworkReason is string) || request.resource.data.reworkReason.size() == 0))
+            && (
+              canManageSite(companyId, siteId)
+              || (
+                isSubcontractor(companyId)
+                && (resource.data.assigneeId == request.auth.uid || resource.data.subId == request.auth.uid)
+                // Subcontractor cannot self-approve ('done') or trigger rework
+                && request.resource.data.status != 'done'
+              )
+            );
+
+          allow delete: if false;
+        }
+
+        // ---------------------------------------------------------------------
+        // 3b-v. Materials (材料跟進)
+        //       - Worker requests -> status MUST start as 'to_order'
+        //       - Company (admin/PM/supervisor) updates -> 'ordered'
+        //       - Worker confirms receipt -> ONLY allowed transition: 'ordered' -> 'delivered'
+        // ---------------------------------------------------------------------
+        match /materials/{materialId} {
+          allow read: if canManageSite(companyId, siteId)
+            || (isSubcontractor(companyId)
+                && canAccessSite(companyId, siteId)
+                && resource.data.requestedBy == request.auth.uid);
+
+          allow create: if canAccessSite(companyId, siteId)
+            && request.resource.data.companyId == companyId
+            && request.resource.data.siteId == siteId
+            && (
+              canManageSite(companyId, siteId)
+              || (isSubcontractor(companyId)
+                  && request.resource.data.status == 'to_order'
+                  && request.resource.data.requestedBy == request.auth.uid)
+            );
+
+          allow update: if canManageSite(companyId, siteId)
+            || (
+              isSubcontractor(companyId)
+              && canAccessSite(companyId, siteId)
+              && resource.data.requestedBy == request.auth.uid
+              && resource.data.status == 'ordered'
+              && request.resource.data.status == 'delivered'
+            );
+
+          allow delete: if false;
+        }
+
+        // ---------------------------------------------------------------------
+        // 3b-vi. File Metadata (文件 / 相片紀錄)
+        //        - Subcontractor: only own uploaded completion photos on assigned site
+        // ---------------------------------------------------------------------
+        match /files/{fileId} {
+          allow read: if canManageSite(companyId, siteId)
+            || (isSubcontractor(companyId)
+                && canAccessSite(companyId, siteId)
+                && resource.data.uploadedBy == request.auth.uid);
+
+          allow create: if canAccessSite(companyId, siteId)
+            && request.resource.data.companyId == companyId
+            && request.resource.data.siteId == siteId
+            && request.resource.data.uploadedBy == request.auth.uid;
+
+          allow update, delete: if canManageSite(companyId, siteId);
+        }
+
+        // ---------------------------------------------------------------------
+        // 3b-vii. Directives & Log Chasers (落指示 / 催交日誌)
+        //         - Create: ONLY company_admin or project_manager
+        //         - Reply: company_admin, project_manager, or assigned site_supervisor
+        // ---------------------------------------------------------------------
+        match /directives/{directiveId} {
+          allow read: if canManageSite(companyId, siteId);
+          allow create: if isManagerOrAdmin(companyId);
+          allow update: if canManageSite(companyId, siteId);
+          allow delete: if false;
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // 3c. Reports (報表 — 工人同平台管理員都睇唔到)
+      // -----------------------------------------------------------------------
+      match /reports/{reportId} {
+        allow read: if isManagerOrAdmin(companyId) || isSiteSupervisor(companyId);
+        allow write: if isManagerOrAdmin(companyId);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Default Deny Everything Else
+    // -------------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

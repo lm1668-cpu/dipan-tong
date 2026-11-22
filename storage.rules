@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// 地盤通 (Deitong) — Firebase Cloud Storage Security Rules (Draft Blueprint — NOT YET DEPLOYED)
+// Reference: https://firebase.google.com/docs/storage/security/rules-conditions
+//
+// Storage path convention:
+//   /companies/{companyId}/sites/{siteId}/{category}/{fileName}
+//   where category is one of: 'photos' | 'drawings' | 'tasks' | 'logs'
+//
+// Guardrails:
+//   1. Strict companyId tenant isolation via Custom Claims (request.auth.token.companyId).
+//   2. Platform admin has ZERO access to company files.
+//   3. Subcontractors CANNOT list company-wide files and can only access/upload
+//      inside assigned sites (max 1 firestore.get() per evaluation, well within
+//      Firebase Storage's 2-document read limit).
+//   4. Soft quota policy: storage cap warnings are handled by backend/UI;
+//      existing uploaded files are NEVER deleted or locked automatically.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return isSignedIn() ? request.auth.token.role : null;
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn() && role() == 'platform_admin';
+    }
+
+    function isInCompany(companyId) {
+      return isSignedIn()
+        && !isPlatformAdmin()
+        && request.auth.token.companyId == companyId;
+    }
+
+    function isManagerOrAdmin(companyId) {
+      return isInCompany(companyId)
+        && (role() == 'company_admin' || role() == 'project_manager');
+    }
+
+    function isSiteSupervisor(companyId) {
+      return isInCompany(companyId) && role() == 'site_supervisor';
+    }
+
+    function isSubcontractor(companyId) {
+      return isInCompany(companyId) && role() == 'subcontractor';
+    }
+
+    function siteData(companyId, siteId) {
+      return firestore.get(/databases/(default)/documents/companies/$(companyId)/sites/$(siteId)).data;
+    }
+
+    function isValidUpload() {
+      return request.resource.size < 20 * 1024 * 1024 // 20 MB per file cap
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Company Site Files: /companies/{companyId}/sites/{siteId}/{category}/{fileName}
+    // -------------------------------------------------------------------------
+    match /companies/{companyId}/sites/{siteId}/{category}/{fileName} {
+
+      // Individual file read (get)
+      allow get: if isManagerOrAdmin(companyId)
+        || (
+          isSiteSupervisor(companyId)
+          && siteData(companyId, siteId).supervisorId == request.auth.uid
+        )
+        || (
+          isSubcontractor(companyId)
+          && (category == 'tasks' || category == 'photos')
+          && request.auth.uid in siteData(companyId, siteId).assignedSubIds
+        );
+
+      // Directory listing (list) — strictly DENIED for subcontractors & platform admins
+      allow list: if isManagerOrAdmin(companyId)
+        || (
+          isSiteSupervisor(companyId)
+          && siteData(companyId, siteId).supervisorId == request.auth.uid
+        );
+
+      // Upload (create / update)
+      allow create, update: if isValidUpload() && (
+        isManagerOrAdmin(companyId)
+        || (
+          isSiteSupervisor(companyId)
+          && siteData(companyId, siteId).supervisorId == request.auth.uid
+        )
+        || (
+          // Subcontractor may upload completion photos under 'tasks' only for assigned sites
+          isSubcontractor(companyId)
+          && category == 'tasks'
+          && request.resource.contentType.matches('image/.*')
+          && request.auth.uid in siteData(companyId, siteId).assignedSubIds
+        )
+      );
+
+      // Never allow subcontractors or platform admins to delete files
+      allow delete: if isManagerOrAdmin(companyId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Default Deny Everything Else (blocks root listing & cross-tenant paths)
+    // -------------------------------------------------------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
