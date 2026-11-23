@@ -1,15 +1,830 @@
 <!doctype html>
-<html lang="zh-Hant" class="antialiased"><head>
+<html lang="zh-Hant" class="antialiased"><head><script data-bard-client-injected="true">(function(firebaseConfig, initialAuthToken, appId) {
+        window.__firebase_config = firebaseConfig;
+        window.__initial_auth_token = initialAuthToken;
+        window.__app_id = appId;
+            })("\n{\n  \"apiKey\": \"AIzaSyCqyCcs2R2e7AegGjvFAwG98wlamtbHvZY\",\n  \"authDomain\": \"bard-frontend.firebaseapp.com\",\n  \"projectId\": \"bard-frontend\",\n  \"storageBucket\": \"bard-frontend.firebasestorage.app\",\n  \"messagingSenderId\": \"175205271074\",\n  \"appId\": \"1:175205271074:web:2b7bd4d34d33bf38e6ec7b\"\n}\n","eyJhbGciOiJSUzI1NiIsImtpZCI6IjExNjRiNzdiNDMzZDdhMDAyMWI4NjE4YjhjYTU3ZTMyZGI5MWUxMTMiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJmaXJlYmFzZS1hZG1pbnNkay1mYnN2Y0BiYXJkLWZyb250ZW5kLmlhbS5nc2VydmljZWFjY291bnQuY29tIiwiYXVkIjoiaHR0cHM6Ly9pZGVudGl0eXRvb2xraXQuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmlkZW50aXR5LmlkZW50aXR5dG9vbGtpdC52MS5JZGVudGl0eVRvb2xraXQiLCJ1aWQiOiIwNDY2ODc1MjI3NzQ5NzI5MjIxNyIsImlzcyI6ImZpcmViYXNlLWFkbWluc2RrLWZic3ZjQGJhcmQtZnJvbnRlbmQuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJjbGFpbXMiOnsiYXBwSWQiOiJjX2E5YjZhODRkNTQ2NDQ0ODhfNWVjMTg0NWRfaW5kZXguaHRtbC04NTkifSwiZXhwIjoxNzk1NDQ2NTMzLCJpYXQiOjE3OTU0NDI5MzMsImFsZyI6IlJTMjU2In0.Zh2HbM3DfNdnF3egdYGLSJZR5LY13aXiK5CccWjDjORaavqJjWGYgOupXjzu_ho656jOw49FuXENHQ7-o6og7FrPgvLfHVipdsTcoekXDjulWFJt-k14FwpvVGLmjVj6M6Lp8ZTXVcAPdo-Ls0c5ZQ_-GYlha7niJeF7lVHceXb8LgND8TX938TnixeeB9olAOCsBCIHrD0EilbpD0pLb_0GumFewpqmMnGzDDJf5YSyg69bjSrtl7P3TLj-cxC0FkgArZQE2Z0rwpdjfqq0QcGhZH0MeKMdct8fgq9TobIc7ONaEqf5WFa_ZQaHqFYoJtt5vIdc-Yebeeq_mS_5qg","c_a9b6a84d54644488_5ec1845d_index.html-859")</script><script data-bard-client-injected="true">
+  document.addEventListener('input', (event) => {
+    if (event.target && (event.target.isContentEditable || event.target.hasAttribute('contenteditable'))) {
+      const clonedDoc = document.cloneNode(true);
+      const injectedScripts = clonedDoc.querySelectorAll('[data-bard-client-injected="true"]');
+      injectedScripts.forEach(el => el.remove());
+      window.parent.postMessage({
+        type: 'inlineEdit',
+        html: '<!DOCTYPE html>\n' + clonedDoc.documentElement.outerHTML
+      }, '*');
+    }
+  });
+</script><script data-bard-client-injected="true">(function(){'use strict';window.addEventListener("message",a=>{a.data&&a.data.type==="SUPPLEMENTAL_DATA_UPDATE"&&window.dispatchEvent(new CustomEvent("supplementaldataupdate",{detail:a.data.data}))});}).call(this);
+</script><script data-bard-client-injected="true">(function() {
+  const SCROLL_KEYS = new Set([
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    ' ', 'Spacebar', 'PageUp', 'PageDown', 'Home', 'End',
+  ]);
+  const HORIZONTAL_KEYS = new Set(['ArrowLeft', 'ArrowRight']);
+
+  function isTextEntryTarget(target) {
+    if (!target) return false;
+    const tagName = target.tagName;
+    return tagName === 'INPUT' || tagName === 'TEXTAREA' ||
+        tagName === 'SELECT' || target.isContentEditable === true;
+  }
+
+  // An element absorbs the key only if it both overflows on the axis being
+  // scrolled and is configured to scroll on that axis. The cheap dimension
+  // test runs first because getComputedStyle forces a style recalc, and this
+  // runs on every keypress. Each axis is read from its own longhand: the
+  // 'overflow' shorthand serializes as two values when the axes differ, which
+  // is the common 'overflow-x: hidden; overflow-y: auto' pane.
+  function canScroll(node, horizontal) {
+    const overflows = horizontal ? node.scrollWidth > node.clientWidth
+                                 : node.scrollHeight > node.clientHeight;
+    if (!overflows) return false;
+    const style = window.getComputedStyle(node);
+    const overflow = horizontal ? style.overflowX : style.overflowY;
+    return overflow === 'auto' || overflow === 'scroll';
+  }
+
+  // Walks up from the event target so nested scrollers keep their behavior.
+  // <body> is included because pages that pin the root height make it the
+  // scroll container.
+  function hasScrollableAncestor(target, horizontal) {
+    let node = target;
+    while (node && node !== document.documentElement) {
+      if (canScroll(node, horizontal)) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
+  function rootCanScroll(horizontal) {
+    const scroller = document.scrollingElement || document.documentElement;
+    if (!scroller) return false;
+    // Tolerate a pixel of rounding so subpixel layouts do not look scrollable.
+    return horizontal ? scroller.scrollWidth > window.innerWidth + 1
+                      : scroller.scrollHeight > window.innerHeight + 1;
+  }
+
+  window.addEventListener('keydown', function(event) {
+    if (!SCROLL_KEYS.has(event.key)) return;
+    if (event.defaultPrevented) return;
+    // Alt and Meta turn arrows into browser history navigation, and Ctrl is
+    // reserved for shortcuts, so none of them are scroll intent.
+    if (event.altKey || event.metaKey || event.ctrlKey) return;
+
+    const target = event.target;
+    if (isTextEntryTarget(target)) return;
+
+    // Anything that can still absorb the scroll gets to keep it.
+    const horizontal = HORIZONTAL_KEYS.has(event.key);
+    if (rootCanScroll(horizontal)) return;
+    if (hasScrollableAncestor(target, horizontal)) return;
+
+    event.preventDefault();
+  }, {capture: true, passive: false});
+})();</script><script data-bard-client-injected="true">(function() {
+  // Ensure this script is executed only once
+  if (window.firebaseAuthBridgeScriptLoaded) {
+    return;
+  }
+  window.firebaseAuthBridgeScriptLoaded = true;
+
+  let nextTokenPromiseId = 0;
+
+  // Stores { resolve, reject } for ongoing token requests
+  const pendingTokenPromises = {};
+
+  // Listen for messages from the Host Application
+  window.addEventListener('message', function(event) {
+
+    const messageData = event.data;
+
+  if (messageData && messageData.type === 'RESOLVE_NEW_FIREBASE_TOKEN') {
+      const { success, token, error, promiseId } = messageData ?? {};
+      if (pendingTokenPromises[promiseId]) {
+        if (success) {
+          pendingTokenPromises[promiseId].resolve(token);
+        } else {
+          pendingTokenPromises[promiseId].reject(new Error(error || 'Token refresh failed from host.'));
+        }
+        delete pendingTokenPromises[promiseId];
+      }
+    }
+  });
+
+  // Expose a function for the Generated App to request a new Firebase token
+  window.requestNewFirebaseToken = function() {
+    const currentPromiseId = nextTokenPromiseId++;
+    const promise = new Promise((resolve, reject) => {
+      pendingTokenPromises[currentPromiseId] = { resolve, reject };
+    });
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'REQUEST_NEW_FIREBASE_TOKEN',
+        promiseId: currentPromiseId
+      }, '*');
+    } else {
+      pendingTokenPromises[currentPromiseId].reject(new Error('No parent window to request token from.'));
+      delete pendingTokenPromises[currentPromiseId];
+    }
+    return promise;
+  };
+})();</script><script data-bard-client-injected="true">
+let realOriginalGetUserMedia = null;
+if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+  realOriginalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+}
+
+(function() {
+  if (navigator.mediaDevices && navigator.mediaDevices.__proto__) {
+    try {
+      Object.defineProperty(navigator.mediaDevices.__proto__, 'getUserMedia', {
+        get: function() {
+          return undefined; // Or throw an error
+        },
+        configurable: false
+      });
+    } catch (error) {
+      console.error("Error defining prototype getter:", error);
+    }
+  }
+})();
+
+(function() {
+  const pendingMediaResolvers = {};
+  let nextMediaPromiseId = 0;
+
+  function requestMediaPermissions(constraints) {
+    const mediaPromiseId = nextMediaPromiseId++;
+    const promise = new Promise((resolve, reject) => {
+      pendingMediaResolvers[mediaPromiseId] = (granted) => {
+        delete pendingMediaResolvers[mediaPromiseId];
+        resolve(granted);
+      };
+    });
+
+    window.parent.postMessage({
+      type: 'requestMediaPermission',
+      constraints: constraints,
+      promiseId: mediaPromiseId,
+    }, '*');
+
+    return promise;
+  }
+
+  let originalGetUserMedia = realOriginalGetUserMedia;
+
+  function interceptGetUserMedia() {
+    if (navigator.mediaDevices) {
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        value: function(constraints) {
+          return requestMediaPermissions(constraints).then((granted) => {
+            if (granted) {
+              if (originalGetUserMedia) {
+                return originalGetUserMedia(constraints);
+              } else {
+                throw new Error("Original getUserMedia not available.");
+              }
+            } else {
+              throw new DOMException('Permission denied', 'NotAllowedError');
+            }
+          });
+        },
+        writable: false,
+        configurable: false
+      });
+    }
+  }
+
+  interceptGetUserMedia();
+
+  const observer = new MutationObserver(function(mutationsList, observer) {
+    for (const mutation of mutationsList) {
+      if (mutation.type === 'reconfigured' && mutation.name === 'getUserMedia' && mutation.object === navigator.mediaDevices) {
+        interceptGetUserMedia();
+      } else if (mutation.type === 'attributes' && mutation.attributeName === 'getUserMedia' && mutation.target === navigator.mediaDevices) {
+        interceptGetUserMedia();
+      } else if (mutation.type === 'childList' && mutation.addedNodes) {
+        mutation.addedNodes.forEach(node => {
+          if (node === navigator.mediaDevices) {
+            interceptGetUserMedia();
+          }
+        });
+      }
+    }
+  });
+
+  function interceptSpeechRecognition() {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+      return;
+    }
+
+    const OriginalSpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const SpeechRecognitionWrapper = function(...args) {
+      const recognizer = new OriginalSpeechRecognition(...args);
+      const originalStart = recognizer.start.bind(recognizer);
+
+      recognizer.start = function() {
+        requestMediaPermissions({ audio: true }).then(granted => {
+          if (granted) {
+            originalStart();
+          } else {
+            const errorEvent = new SpeechRecognitionErrorEvent('error');
+            errorEvent.error = 'not-allowed'; // This is the standard error for permission denial.
+            recognizer.dispatchEvent(errorEvent);
+          }
+        });
+      };
+
+      return recognizer;
+    };
+
+    SpeechRecognitionWrapper.prototype = OriginalSpeechRecognition.prototype;
+    SpeechRecognitionWrapper.prototype.constructor = SpeechRecognitionWrapper;
+
+    if (window.SpeechRecognition) {
+      window.SpeechRecognition = SpeechRecognitionWrapper;
+    }
+    if (window.webkitSpeechRecognition) {
+      window.webkitSpeechRecognition = SpeechRecognitionWrapper;
+    }
+  }
+
+  interceptSpeechRecognition();
+
+  window.addEventListener('message', function(event) {
+    if (event.data) {
+      if (event.data.type === 'resolveMediaPermission') {
+        const { promiseId, granted } = event.data;
+        if (pendingMediaResolvers[promiseId]) {
+          pendingMediaResolvers[promiseId](granted);
+        }
+      }
+    }
+  });
+
+})();</script><script ws-interception-config="{&quot;parentOrigin&quot;:&quot;https://gemini.google.com&quot;,&quot;proxiedDomains&quot;:[]}" data-bard-client-injected="true">(function(){'use strict';var u=typeof Object.defineProperties=="function"?Object.defineProperty:function(b,d,e){if(b==Array.prototype||b==Object.prototype)return b;b[d]=e.value;return b};function v(b){b=["object"==typeof globalThis&&globalThis,b,"object"==typeof window&&window,"object"==typeof self&&self,"object"==typeof global&&global];for(var d=0;d<b.length;++d){var e=b[d];if(e&&e.Math==Math)return e}throw Error("Cannot find global object");}var w=v(this);
+function y(b,d){if(d)a:{var e=w;b=b.split(".");for(var h=0;h<b.length-1;h++){var k=b[h];if(!(k in e))break a;e=e[k]}b=b[b.length-1];h=e[b];d=d(h);d!=h&&d!=null&&u(e,b,{configurable:!0,writable:!0,value:d})}}function z(b){function d(h){return b.next(h)}function e(h){return b.throw(h)}return new Promise(function(h,k){function m(n){n.done?h(n.value):Promise.resolve(n.value).then(d,e).then(m,k)}m(b.next())})}y("globalThis",function(b){return b||w});/*
+
+ Copyright The Closure Library Authors.
+ SPDX-License-Identifier: Apache-2.0
+*/
+function A(b,d){function e(){}e.prototype=d.prototype;b.i=d.prototype;b.prototype=new e;b.prototype.constructor=b;b.h=function(h,k,m){for(var n=Array(arguments.length-2),p=2;p<arguments.length;p++)n[p-2]=arguments[p];return d.prototype[k].apply(h,n)}};function B(b,d,e="*"){function h(a){if(typeof a==="string")return F.encode(a).buffer;if(a instanceof ArrayBuffer)return a.slice(0);if(ArrayBuffer.isView(a))return a.buffer.slice(a.byteOffset,a.byteOffset+a.byteLength);throw Error("Invalid data type");}function k(a){a=h(a);var f={type:"send",data:new Uint8Array(a)},g;(g=r)==null||g.postMessage(f,[a])}function m(){if(!r)throw Error("Data port not captured yet.");r.onmessage=a=>{if(a.data.type==="message"){a=new MessageEvent("message",{data:G.decode(a.data.data)});
+let f;(f=c.onmessage)==null||f.call(c,a);c.dispatchEvent(a)}}}function n(){if(!t)throw Error("Control port not captured yet.");t.onmessage=a=>{switch(a.data.type){case "open":l=1;var f=new Event("open"),g;(g=c.onopen)==null||g.call(c,f);c.dispatchEvent(f);q.forEach(H=>{k(H)});q=[];break;case "close":g=a.data;l=3;g=new CloseEvent("close",{code:g.code,reason:g.reason,wasClean:g.wasClean});(f=c.onclose)==null||f.call(c,g);c.dispatchEvent(g);break;case "error":l=3;f=new Event("error");let x;(x=c.onerror)==
+null||x.call(c,f);c.dispatchEvent(f)}}}function p(a){return z(function*(){var f=new MessageChannel;t=f.port1;var g=new MessageChannel;r=g.port1;n();m();window.parent.postMessage({type:"websocket_open",portOrdering:["control","data"],url:b,protocols:a||[],connectionId:I},e,[f.port2,g.port2])}())}var c=Reflect.construct(EventTarget,[],new.target);c.CONNECTING=0;c.OPEN=1;c.CLOSING=2;c.CLOSED=3;c.url=b;c.binaryType="arraybuffer";c.protocol="";c.extensions="";var l=0,t=null,r=null,q=[],F=new TextEncoder,
+G=new TextDecoder;c.onopen=null;c.onmessage=null;c.onclose=null;c.onerror=null;Object.defineProperty(c,"readyState",{get:()=>l,enumerable:!0,configurable:!0});Object.defineProperty(c,"bufferedAmount",{get:()=>{var a=0;q.forEach(f=>{a+=typeof f==="string"?f.length:f.byteLength});return a},enumerable:!0,configurable:!0});var I=function(){var a;return((a=globalThis.crypto)==null?0:a.randomUUID)?globalThis.crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,f=>{var g=Math.random()*
+16|0;return(f==="x"?g:g&3|8).toString(16)})}();c.send=a=>{if(l===1)a instanceof Blob?a.arrayBuffer().then(f=>{k(f)}):k(a);else if(l===0)if(typeof a==="string")q.push(a);else if(a instanceof ArrayBuffer||ArrayBuffer.isView(a))q.push(h(a));else throw Error("Sending Blob is not supported before the connection is open.");else console.debug("WebSocket send called in CLOSING or CLOSED state; ignored.")};c.close=(a=1E3,f="")=>{if(l!==2&&l!==3){l=2;a={type:"close",code:a,reason:f,wasClean:a===1E3};var g;
+(g=t)==null||g.postMessage(a)}};Promise.resolve().then(()=>p(d));return c}A(B,EventTarget);var C=document.currentScript,D=C==null?void 0:C.getAttribute("ws-interception-config");if(!D)throw Error("WebSocket Interceptor: Missing ws-interception-config attribute in the script tag.");var E=JSON.parse(D);if(!E.parentOrigin||typeof E.parentOrigin!=="string")throw Error("WebSocket Interceptor: Invalid parentOrigin in ws-interception-config");
+(function(b){var d=Object.getOwnPropertyDescriptor(window,"WebSocket");if(!d||d.writable||d.configurable)d=Object.assign(function(e,h){try{let k=(new URL(e)).hostname;if(b.proxiedDomains.some(m=>k===m||k.endsWith(`.${m}`)))return new B(e,h,b.parentOrigin)}catch(k){throw window.parent.postMessage({type:"websocket_blocked",url:e,reason:"blocked_invalid_url"},b.parentOrigin),new DOMException(`WebSocket connection to '${e}' is not allowed in Canvas.`,"SecurityError");}window.parent.postMessage({type:"websocket_blocked",
+url:e,reason:"blocked_domain_not_allowlisted"},b.parentOrigin);throw new DOMException(`WebSocket connection to '${e}' is not allowed in Canvas.`,"SecurityError");},{CONNECTING:0,OPEN:1,CLOSING:2,CLOSED:3}),Object.defineProperty(window,"WebSocket",{value:d,writable:!1,configurable:!1})})({proxiedDomains:E.proxiedDomains||[],parentOrigin:E.parentOrigin});}).call(this);
+</script><script data-bard-client-injected="true">((function(modelInformation) {
+  const originalFetch = window.fetch;
+  // TODO: b/421908508 - Move these out of the script and match all generative AI model calls.
+  let googleLlmBaseApiUrls = [
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.textModelName + ':streamGenerateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.textModelName + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageModelName + ':predict',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageModelName + ':predictLongRunning',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageEditModelName + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.imageTransformModelName + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.videoModelName + ':predict',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.videoModelName + ':predictLongRunning',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + modelInformation.ttsModelName + ':generateContent',
+  ];
+  modelInformation.deprecatedTextModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+    );
+  });
+  modelInformation.deprecatedImageModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':predict',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':predictLongRunning',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+    );
+  });
+  modelInformation.deprecatedGenerateImageModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+    );
+  });
+  modelInformation.deprecatedImageTransformModelNames.forEach((modelName) => {
+    googleLlmBaseApiUrls.push(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/' + modelName + ':streamGenerateContent',
+    );
+  });
+
+  const pendingFetchResolvers = {};
+  let nextPromiseId = 0;
+
+  function handleStringInput(input, optionsArgument) {
+    const actualUrl = input;
+    const fetchCallArgs = [actualUrl, optionsArgument];
+    const effectiveOptions = optionsArgument || {};
+    const bodyForApiKeyCheck = effectiveOptions.body;
+    const bodyForPostMessage = effectiveOptions.body;
+    return { actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage };
+  }
+
+  function handleRequestInput(input, optionsArgument) {
+    const actualUrl = input.url;
+    const fetchCallArgs = [input, optionsArgument];
+    const effectiveOptions = { method: input.method, headers: new Headers(input.headers) };
+    let bodyForApiKeyCheck;
+    let bodyForPostMessage;
+
+    if (optionsArgument) {
+      if (optionsArgument.method) effectiveOptions.method = optionsArgument.method;
+      if (optionsArgument.headers) effectiveOptions.headers = new Headers(optionsArgument.headers);
+      if ('body' in optionsArgument) {
+        bodyForApiKeyCheck = optionsArgument.body;
+        bodyForPostMessage = optionsArgument.body;
+      } else {
+        bodyForApiKeyCheck = undefined;
+        bodyForPostMessage = input.body;
+      }
+    } else {
+      bodyForApiKeyCheck = undefined;
+      bodyForPostMessage = input.body;
+    }
+    return { actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage };
+  }
+
+  window.fetch = function(input, optionsArgument) {
+    let actualUrl;
+    let fetchCallArgs;
+    let effectiveOptions = {};
+    let bodyForApiKeyCheck;
+    let bodyForPostMessage;
+
+    if (typeof input === 'string') {
+      ({actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage} = handleStringInput(input, optionsArgument));
+    } else if (input instanceof Request) {
+      ({actualUrl, fetchCallArgs, effectiveOptions, bodyForApiKeyCheck, bodyForPostMessage} = handleRequestInput(input, optionsArgument));
+    } else {
+      return originalFetch.apply(window, [input, optionsArgument]);
+    }
+
+    effectiveOptions.method = effectiveOptions.method || 'GET';
+    if (!effectiveOptions.headers) {
+      effectiveOptions.headers = new Headers();
+    }
+
+
+    if (typeof actualUrl === 'string' && googleLlmBaseApiUrls.some((url) => actualUrl.startsWith(url))) {
+      let apiKeyIsNull = true;
+
+      const regex = new RegExp("models/([^:]+)");
+      const modelNameMatch = actualUrl.match(regex);
+      const modelName = modelNameMatch ? modelNameMatch[1] : 'unspecified';
+
+
+      try {
+        const urlObject = new URL(actualUrl);  // Use URL object for robust parsing
+        const apiKeyParam = urlObject.searchParams.get('key');
+        if (apiKeyParam) {
+          apiKeyIsNull = false;
+        }
+      } catch (e) {
+        // Continue checks even if URL parsing fails
+      }
+
+      if (apiKeyIsNull && effectiveOptions.headers) {
+        const h = new Headers(effectiveOptions.headers);
+        const apiKeyHeaderValue = h.get('X-API-Key') || h.get('x-api-key');
+        if (apiKeyHeaderValue) {
+          apiKeyIsNull = false;
+          return originalFetch.apply(window, fetchCallArgs);
+        }
+      }
+
+      if (apiKeyIsNull && effectiveOptions.method && ['POST', 'PUT', 'PATCH'].includes(effectiveOptions.method.toUpperCase()) && typeof bodyForApiKeyCheck === 'string') {
+        try {
+          const bodyData = JSON.parse(bodyForApiKeyCheck);
+          if (bodyData && bodyData.apiKey) {
+            apiKeyIsNull = false;
+            return originalFetch.apply(window, fetchCallArgs);
+          }
+        } catch (e) {
+          // Ignore JSON parsing errors
+        }
+      }
+
+      if(apiKeyIsNull) {
+        const promiseId = nextPromiseId++;
+        const promise = new Promise((resolve) => {
+          pendingFetchResolvers[promiseId] = (resolvedResponse) => {
+            delete pendingFetchResolvers[promiseId];
+            resolve(resolvedResponse);
+          };
+        });
+
+        let serializedBodyForPostMessage;
+        if (typeof bodyForPostMessage === 'string' || bodyForPostMessage == null) {
+            serializedBodyForPostMessage = bodyForPostMessage;
+        } else if (bodyForPostMessage instanceof ReadableStream) {
+            serializedBodyForPostMessage = null;
+        } else {
+            try {
+                serializedBodyForPostMessage = JSON.stringify(bodyForPostMessage);
+            } catch (e) {
+                serializedBodyForPostMessage = null;
+            }
+        }
+
+        const messageOptions = {
+            method: effectiveOptions.method,
+            headers: Object.fromEntries(new Headers(effectiveOptions.headers).entries()),
+            body: serializedBodyForPostMessage
+        };
+
+        window.parent.postMessage({
+          type: 'requestFetch',
+          url: actualUrl,
+          modelName: modelName,
+          options: messageOptions,
+          promiseId: promiseId,
+        }, '*');
+
+        return promise;
+      }
+      return originalFetch.apply(window, fetchCallArgs);
+    }
+    return originalFetch.apply(window, fetchCallArgs);
+  };
+
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'resolveFetch') {
+      const { promiseId, response } = event.data;
+      if (pendingFetchResolvers[promiseId]) {
+        try {
+          const reconstructedResponse = new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: new Headers(response.headers),
+          });
+          pendingFetchResolvers[promiseId](reconstructedResponse);
+        } catch (error) {
+          pendingFetchResolvers[promiseId](new Response(null, { status: 500, statusText: "Interceptor Response Reconstruction Error" }));
+        }
+      }
+    }
+  });
+
+}))({"textModelName":"gemini-3-flash-preview","imageModelName":"imagen-4.0-generate-001","imageEditModelName":"gemini-3.1-flash-image","imageTransformModelName":"gemini-3-pro-image","videoModelName":"veo-2.0-generate-001","ttsModelName":"gemini-2.5-flash-preview-tts","deprecatedTextModelNames":["gemini-2.0-flash","gemini-2.5-flash","gemini-2.5-flash-preview-04-17","gemini-2.5-flash-preview-05-20","gemini-2.5-flash-preview-09-2025"],"deprecatedImageModelNames":["imagen-3.0-generate-001","imagen-3.0-generate-002"],"deprecatedGenerateImageModelNames":["gemini-2.5-flash-image-preview","gemini-2.5-flash-image","gemini-3.1-flash-image-preview"],"deprecatedImageTransformModelNames":["gemini-3-pro-image-preview-11-2025"]})</script><script data-bard-client-injected="true">(function() {
+  const OVERLAY_SELECTOR =
+    'dialog[open], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="combobox"]';
+
+  function isVisibleOverlay(element) {
+    if (element.closest('[hidden], [aria-hidden="true"], [inert]')) {
+      return false;
+    }
+    if (window.getComputedStyle(element).visibility === 'hidden') {
+      return false;
+    }
+    for (let cur = element; cur; cur = cur.parentElement) {
+      if (window.getComputedStyle(cur).display === 'none') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function hasOpenOverlay() {
+    const candidates = document.querySelectorAll(OVERLAY_SELECTOR);
+    for (let i = 0; i < candidates.length; i++) {
+      if (isVisibleOverlay(candidates[i])) {
+        return true;
+      }
+    }
+    try {
+      if (document.querySelector('[popover]:popover-open')) {
+        return true;
+      }
+    } catch (e) {
+      // Ignore engines that do not support :popover-open.
+    }
+    return false;
+  }
+
+  function isNonEmptySearchInput(target) {
+    return (
+      Boolean(target) &&
+      target.tagName === 'INPUT' &&
+      typeof target.type === 'string' &&
+      target.type.toLowerCase() === 'search' &&
+      typeof target.value === 'string' &&
+      target.value.length > 0
+    );
+  }
+
+  function shouldIgnoreEscape(event) {
+    return (
+      event.key !== 'Escape' ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.isComposing ||
+      event.repeat ||
+      event.keyCode === 229 ||
+      isNonEmptySearchInput(event.target)
+    );
+  }
+
+  let shouldIgnoreCaptureState = false;
+
+  window.addEventListener(
+    'keydown',
+    function(event) {
+      if (event.key === 'Escape') {
+        shouldIgnoreCaptureState =
+          hasOpenOverlay() || isNonEmptySearchInput(event.target);
+      }
+    },
+    {capture: true},
+  );
+
+  window.addEventListener('keydown', function(event) {
+    if (
+      shouldIgnoreEscape(event) ||
+      event.defaultPrevented ||
+      shouldIgnoreCaptureState
+    ) {
+      return;
+    }
+    const wasBlockedOnCapture = shouldIgnoreCaptureState;
+    queueMicrotask(function() {
+      if (event.defaultPrevented || wasBlockedOnCapture) {
+        return;
+      }
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({'type': 'escapeKey'}, '*');
+      }
+    });
+  });
+})();</script><script data-bard-client-injected="true">(function() {
+  function normalizeSlug(str) {
+    try {
+      return str
+        .trim()
+        .toLowerCase()
+        .replace(/[^p{L}p{N}s_-]/gu, '')
+        .replace(/s+/g, '-');
+    } catch (e) {
+      return str
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9s_-]/g, '')
+        .replace(/s+/g, '-');
+    }
+  }
+
+  function findTargetElement(hash) {
+    if (!hash || hash === '#') {
+      return null;
+    }
+    const rawId = hash.startsWith('#') ? hash.slice(1) : hash;
+    let decodedId = rawId;
+    try {
+      decodedId = decodeURIComponent(rawId);
+    } catch (e) {
+      // Ignore URI malformed errors.
+    }
+
+    // 1. Direct ID match (raw and decoded).
+    let target = document.getElementById(rawId) || document.getElementById(decodedId);
+    if (target) {
+      return target;
+    }
+
+    // 2. Name attribute match (<a name="...">).
+    try {
+      if (typeof CSS !== 'undefined' && CSS.escape) {
+        target =
+          document.querySelector('[name="' + CSS.escape(rawId) + '"]') ||
+          document.querySelector('[name="' + CSS.escape(decodedId) + '"]');
+      } else {
+        const namedElements = document.getElementsByName(rawId);
+        if (namedElements && namedElements.length > 0) {
+          return namedElements[0];
+        }
+      }
+    } catch (e) {
+      // Ignore querySelector syntax errors.
+    }
+    if (target) {
+      return target;
+    }
+
+    // 3. Match heading text by slug (for Markdown TOCs where headings lack explicit IDs).
+    const targetSlug = normalizeSlug(decodedId);
+    if (targetSlug) {
+      for (const heading of document.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
+        if (normalizeSlug(heading.textContent || '') === targetSlug) {
+          return heading;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  document.addEventListener('click', function(event) {
+    const target = event.target;
+    const anchor = target && typeof target.closest === 'function' ? target.closest('a') : null;
+    if (!anchor) {
+      return;
+    }
+
+    const href = anchor.getAttribute('href');
+    if (
+      !href ||
+      href.trim().toLowerCase().startsWith('javascript:') ||
+      anchor.hasAttribute('download')
+    ) {
+      return;
+    }
+
+    // Check if the link is an in-page hash / anchor link.
+    if (href.startsWith('#')) {
+      event.preventDefault();
+      const targetElement = findTargetElement(href);
+      if (targetElement) {
+        targetElement.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }
+      return;
+    }
+
+    // Check if the URL has the same origin/pathname but with a hash.
+    try {
+      const url = new URL(anchor.href, window.location.href);
+      if (
+        url.hash &&
+        url.origin === window.location.origin &&
+        url.pathname === window.location.pathname
+      ) {
+        event.preventDefault();
+        const targetElement = findTargetElement(url.hash);
+        if (targetElement) {
+          targetElement.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
+        return;
+      }
+    } catch (e) {
+      // Fall through if URL parsing fails.
+    }
+
+    // For all external or full navigation links, prevent iframe-level navigation
+    // (which breaks in AGSA WebView or sandboxed iframes) and ensure they open
+    // safely in a new tab/window.
+    if (anchor.target !== '_blank') {
+      event.preventDefault();
+      window.open(anchor.href, '_blank', 'noopener,noreferrer');
+    }
+  }, {capture: true});
+})();</script><script data-bard-client-injected="true">(function(){'use strict';function a(){window.parent.postMessage({type:"interaction"},"*")}window.addEventListener("click",a,{capture:!0,passive:!0});window.addEventListener("touchstart",a,{capture:!0,passive:!0});window.addEventListener("keydown",a,{capture:!0,passive:!0});}).call(this);
+</script><script data-bard-client-injected="true">(function() {
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+
+    /**
+   * Normalizes an error event or a promise rejection reason into a structured error object.
+   * @param {*} errorEventOrReason The error object or reason.
+   * @return {object} Structured error data { message, name, stack }.
+   */
+  function getErrorObject(errorEventOrReason) {
+    if (errorEventOrReason instanceof Error) {
+      return {
+        message: errorEventOrReason.message,
+        name: errorEventOrReason.name,
+        stack: errorEventOrReason.stack,
+      };
+    }
+    // Fallback for non-Error objects.
+    try {
+      return {
+        message: JSON.stringify(errorEventOrReason),
+        name: 'UnknownErrorType',
+        stack: null,
+      };
+    } catch (e) {
+      return {
+        message: String(errorEventOrReason),
+        name: 'UnknownErrorTypeNonStringifiable',
+        stack: null,
+      };
+    }
+  }
+
+  /**
+   * Converts an array of arguments (from log/error) into a single string.
+   * Handles Error objects specially to include their message and stack.
+   * @param {Array<*>} args - Arguments passed to console methods.
+   * @return {string} A string representation of the arguments.
+   */
+  function stringifyArgs(args) {
+    return args
+      .map((arg) => {
+        if (arg instanceof Error) {
+          const {message, stack} = arg;
+          return `Error: ${message}${stack ? ('\nStack: ' + stack) : ''}`;
+        }
+        if (typeof arg === 'object' && arg !== null) {
+          try {
+            return JSON.stringify(arg);
+          } catch (error) {
+            return '[Circular Object]';
+          }
+        } else {
+          return String(arg);
+        }
+      })
+      .join(' ');
+  }
+
+  console.log = function(...args) {
+    const logString = stringifyArgs(args);
+    window.parent.postMessage({ type: 'log', message: logString }, '*');
+    originalConsoleLog.apply(console, args);
+  };
+
+  console.error = function(...args) {
+    let errorData;
+    if (args.length > 0 && args[0] instanceof Error) {
+      const err = args[0];
+      // If the first arg is an Error, capture its details.
+      errorData = {
+        type: 'error',
+        source: 'CONSOLE_ERROR',
+        ...getErrorObject(err),
+        rawArgsString: stringifyArgs(args.slice(1)),
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      // If not an Error object, treat all args as a general error message.
+      errorData = {
+        type: 'error',
+        source: 'CONSOLE_ERROR',
+        message: stringifyArgs(args),
+        name: 'ConsoleLoggedError',
+        stack: null,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    window.parent.postMessage(errorData, '*');
+    originalConsoleError.apply(console, args);
+  };
+
+  // Listen for global unhandled synchronous errors.
+  window.addEventListener('error', function(event) {
+    const errorDetails = event.error ? getErrorObject(event.error) : {
+      message: event.message,
+      name: 'GlobalError',
+      stack: null,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    };
+
+    window.parent.postMessage({
+      type: 'error',
+      source: 'global',
+      ...errorDetails,
+      message: errorDetails.message || event.message,
+      timestamp: new Date().toISOString(),
+    }, '*');
+  });
+
+  // Listen for unhandled promise rejections (asynchronous errors).
+  window.addEventListener('unhandledrejection', function(event) {
+    const errorDetails = getErrorObject(event.reason);
+
+    window.parent.postMessage({
+      type: 'error',
+      source: 'unhandledrejection',
+      ...errorDetails,
+      message: errorDetails.message || 'Unhandled Promise Rejection',
+      timestamp: new Date().toISOString(),
+    }, '*');
+  });
+
+})();</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>地盤通 — 香港室內設計及工程工地管理</title>
   <meta name="description" content="地盤通：香港室內設計同工程公司嘅工地管理。日誌、執漏、人手、材料，一個位跟到尾。">
   <meta name="theme-color" content="#0E1C3A">
-  <link rel="icon" type="image/svg+xml" href="/dipan-tong/assets/favicon-DQEaThJd.svg">
+  <link rel="icon" type="image/svg+xml" href="./public/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&amp;display=swap">
-  <link rel="stylesheet" crossorigin="anonymous" href="https://me.kis.v2.scr.kaspersky-labs.com/E3E8934C-235A-4B0E-825A-35A08381A191/abn/main.css?attr=aHR0cHM6Ly9sbTE2NjgtY3B1LmdpdGh1Yi5pby9kaXBhbi10b25nLw"><script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -33,107 +848,1423 @@
             mint: '#D8F3E5',
             azure: '#1D5FD6',
           },
-          fontFamily: {
-            sans: ['"Noto Sans TC"', 'system-ui', 'sans-serif'],
-            display: ['"Noto Sans TC"', 'system-ui', 'sans-serif'],
-          },
-          boxShadow: {
-            card: '0 6px 24px -10px rgba(14, 28, 58, 0.14)',
-          },
+          fontFamily: { sans: ['"Noto Sans TC"', 'system-ui', 'sans-serif'], display: ['"Noto Sans TC"', 'system-ui', 'sans-serif'] },
+          boxShadow: { card: '0 6px 24px -10px rgba(14, 28, 58, 0.14)' },
         },
       },
     };
   </script>
-  <style>html,body{color:#172033;touch-action:manipulation;background:#faf7f0;font-family:Noto Sans TC,system-ui,sans-serif}.tabular-nums{font-variant-numeric:tabular-nums}#toast-wrap{z-index:9999;pointer-events:none;flex-direction:column;gap:.5rem;width:min(92vw,420px);display:flex;position:fixed;top:1rem;left:50%;transform:translate(-50%)}.toast-item{pointer-events:auto;border-radius:1rem;padding:.75rem 1rem;font-size:.875rem;font-weight:700;animation:.18s ease-out fadeIn;box-shadow:0 10px 30px #0e1c3a33}@keyframes fadeIn{0%{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}</style>
-  <script type="module" crossorigin="" src="/dipan-tong/assets/index-DaKhHIFD.js"></script>
-<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:"Noto Sans TC", system-ui, sans-serif;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.sticky{position:sticky}.inset-x-3{left:0.75rem;right:0.75rem}.inset-x-0{left:0px;right:0px}.inset-y-0{top:0px;bottom:0px}.bottom-3{bottom:0.75rem}.top-0{top:0px}.bottom-0{bottom:0px}.left-0{left:0px}.z-20{z-index:20}.z-30{z-index:30}.z-40{z-index:40}.mx-auto{margin-left:auto;margin-right:auto}.mt-1{margin-top:0.25rem}.mt-2{margin-top:0.5rem}.mt-4{margin-top:1rem}.mt-5{margin-top:1.25rem}.block{display:block}.flex{display:flex}.inline-flex{display:inline-flex}.grid{display:grid}.hidden{display:none}.size-11{width:2.75rem;height:2.75rem}.size-full{width:100%;height:100%}.size-10{width:2.5rem;height:2.5rem}.size-9{width:2.25rem;height:2.25rem}.h-1\.5{height:0.375rem}.h-64{height:16rem}.h-44{height:11rem}.min-h-dvh{min-height:100dvh}.min-h-11{min-height:2.75rem}.min-h-12{min-height:3rem}.min-h-16{min-height:4rem}.min-h-10{min-height:2.5rem}.w-full{width:100%}.w-60{width:15rem}.min-w-0{min-width:0px}.max-w-5xl{max-width:64rem}.max-w-3xl{max-width:48rem}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}.scale-105{--tw-scale-x:1.05;--tw-scale-y:1.05;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.place-items-center{place-items:center}.items-start{align-items:flex-start}.items-end{align-items:flex-end}.items-center{align-items:center}.items-stretch{align-items:stretch}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-4{gap:1rem}.gap-1{gap:0.25rem}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.space-y-5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.25rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rounded-2xl{border-radius:1rem}.rounded-3xl{border-radius:1.5rem}.rounded-full{border-radius:9999px}.border{border-width:1px}.border-2{border-width:2px}.border-b{border-bottom-width:1px}.border-clay\/40{border-color:rgb(201 74 56 / 0.4)}.border-gold{--tw-border-opacity:1;border-color:rgb(245 183 0 / var(--tw-border-opacity, 1))}.border-leaf\/40{border-color:rgb(30 111 78 / 0.4)}.border-line{--tw-border-opacity:1;border-color:rgb(229 222 201 / var(--tw-border-opacity, 1))}.bg-paper{--tw-bg-opacity:1;background-color:rgb(250 247 240 / var(--tw-bg-opacity, 1))}.bg-blush{--tw-bg-opacity:1;background-color:rgb(255 244 241 / var(--tw-bg-opacity, 1))}.bg-card{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-card\/95{background-color:rgb(255 255 255 / 0.95)}.bg-clay{--tw-bg-opacity:1;background-color:rgb(201 74 56 / var(--tw-bg-opacity, 1))}.bg-gold{--tw-bg-opacity:1;background-color:rgb(245 183 0 / var(--tw-bg-opacity, 1))}.bg-ice{--tw-bg-opacity:1;background-color:rgb(238 243 250 / var(--tw-bg-opacity, 1))}.bg-leaf-soft{--tw-bg-opacity:1;background-color:rgb(231 245 238 / var(--tw-bg-opacity, 1))}.bg-navy{--tw-bg-opacity:1;background-color:rgb(14 28 58 / var(--tw-bg-opacity, 1))}.bg-navy\/90{background-color:rgb(14 28 58 / 0.9)}.bg-clay-soft{--tw-bg-opacity:1;background-color:rgb(253 236 233 / var(--tw-bg-opacity, 1))}.bg-paper-2{--tw-bg-opacity:1;background-color:rgb(241 236 224 / var(--tw-bg-opacity, 1))}.bg-paper\/95{background-color:rgb(250 247 240 / 0.95)}.object-cover{object-fit:cover}.object-\[center_40\%\]{object-position:center 40%}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-3{padding:0.75rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-3{padding-top:0.75rem;padding-bottom:0.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-2\.5{padding-top:0.625rem;padding-bottom:0.625rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-2\.5{padding-left:0.625rem;padding-right:0.625rem}.py-0\.5{padding-top:0.125rem;padding-bottom:0.125rem}.py-5{padding-top:1.25rem;padding-bottom:1.25rem}.pb-10{padding-bottom:2.5rem}.pb-12{padding-bottom:3rem}.pb-28{padding-bottom:7rem}.pt-4{padding-top:1rem}.text-left{text-align:left}.text-center{text-align:center}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-black{font-weight:900}.font-bold{font-weight:700}.font-medium{font-weight:500}.tabular-nums{--tw-numeric-spacing:tabular-nums;font-variant-numeric:var(--tw-ordinal) var(--tw-slashed-zero) var(--tw-numeric-figure) var(--tw-numeric-spacing) var(--tw-numeric-fraction)}.leading-5{line-height:1.25rem}.leading-6{line-height:1.5rem}.leading-none{line-height:1}.text-ink{--tw-text-opacity:1;color:rgb(23 32 51 / var(--tw-text-opacity, 1))}.text-card{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-card\/85{color:rgb(255 255 255 / 0.85)}.text-clay{--tw-text-opacity:1;color:rgb(201 74 56 / var(--tw-text-opacity, 1))}.text-gold{--tw-text-opacity:1;color:rgb(245 183 0 / var(--tw-text-opacity, 1))}.text-gold-2{--tw-text-opacity:1;color:rgb(185 130 0 / var(--tw-text-opacity, 1))}.text-leaf{--tw-text-opacity:1;color:rgb(30 111 78 / var(--tw-text-opacity, 1))}.text-muted{--tw-text-opacity:1;color:rgb(93 102 122 / var(--tw-text-opacity, 1))}.text-navy{--tw-text-opacity:1;color:rgb(14 28 58 / var(--tw-text-opacity, 1))}.text-paper{--tw-text-opacity:1;color:rgb(250 247 240 / var(--tw-text-opacity, 1))}.text-card\/70{color:rgb(255 255 255 / 0.7)}.text-card\/80{color:rgb(255 255 255 / 0.8)}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.shadow-card{--tw-shadow:0 6px 24px -10px rgba(14, 28, 58, 0.14);--tw-shadow-colored:0 6px 24px -10px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);--tw-shadow-color:#FFFFFF;--tw-shadow:var(--tw-shadow-colored)}.ring-2{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)}.ring-gold{--tw-ring-opacity:1;--tw-ring-color:rgb(245 183 0 / var(--tw-ring-opacity, 1))}.backdrop-blur{--tw-backdrop-blur:blur(8px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.disabled\:opacity-50:disabled{opacity:0.5}@media (min-width: 640px){.sm\:h-80{height:20rem}}@media (min-width: 768px){.md\:flex{display:flex}.md\:hidden{display:none}.md\:grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.md\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.md\:px-8{padding-left:2rem;padding-right:2rem}.md\:pb-12{padding-bottom:3rem}.md\:pl-60{padding-left:15rem}}@media (min-width: 1024px){.lg\:absolute{position:absolute}.lg\:inset-0{inset:0px}.lg\:h-full{height:100%}.lg\:min-h-80{min-height:20rem}.lg\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.lg\:grid-cols-4{grid-template-columns:repeat(4, minmax(0, 1fr))}}</style><style type="text/css" class="abn_style" nonce="undefined">.guangg {display: none !important; color: #70df2f !important; background-color: #367c29 !important;}</style><style id="monica-reading-highlight-style">
-        .monica-reading-highlight {
-          animation: fadeInOut 1.5s ease-in-out;
-        }
-
-        @keyframes fadeInOut {
-          0%, 100% { background-color: transparent; }
-          30%, 70% { background-color: rgba(2, 118, 255, 0.20); }
-        }
-      </style></head>
-<body class="min-h-dvh bg-paper text-ink" monica-id="fhimbbbmdjiifimnepkibjfjbppnjble" monica-version="8.0.1">
+  <style id="deitong-style">
+    html, body { background: #FAF7F0; color: #172033; font-family: "Noto Sans TC", system-ui, sans-serif; touch-action: manipulation; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    #toast-wrap { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: .5rem; width: min(92vw, 420px); pointer-events: none; }
+    .toast-item { pointer-events: auto; border-radius: 1rem; padding: .75rem 1rem; font-size: .875rem; font-weight: 700; box-shadow: 0 10px 30px rgba(14,28,58,.22); animation: fadeIn .18s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="min-h-dvh bg-paper text-ink">
   <div id="toast-wrap" aria-live="polite"></div>
-  <div id="app">
-        <div class="min-h-dvh bg-paper">
-          <aside class="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-navy md:flex">
-            <a href="#/app/admin" class="flex items-center gap-3 px-4 py-5">
-              <span class="grid size-11 shrink-0 overflow-hidden rounded-full ring-2 ring-gold"><img src="./photos/mascot.jpg" alt="地盤通師傅仔" class="size-full scale-105 object-cover" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='./photos/mascot.jpg'}" data-fb="1"></span>
-              <span><span class="block text-lg font-black leading-none text-card">地盤通</span><span class="text-xs text-card/70">工地管理</span></span>
-            </a>
-            <nav class="flex flex-1 flex-col gap-1 px-3">
-              <a href="#/app/admin" class="flex min-h-11 items-center rounded-2xl px-3 text-sm font-bold bg-gold text-ink">客戶公司</a><a href="#/app/billing" class="flex min-h-11 items-center rounded-2xl px-3 text-sm font-bold text-card/80">套餐說明</a><a href="#/app/account" class="flex min-h-11 items-center rounded-2xl px-3 text-sm font-bold text-card/80">帳戶</a>
-            </nav>
-          </aside>
-          <div class="md:pl-60">
-            <header class="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
-              <p class="bg-navy px-4 py-2 text-center text-xs leading-5 text-gold" data-testid="cloud-banner">已連接 Firebase（renocamp-site）· 雲端帳戶：info@pbc.ltd · 資料即時同步並按公司隔離</p>
-              <div class="flex items-center gap-3 px-4 py-3">
-                <span class="grid size-11 shrink-0 place-items-center rounded-full bg-navy text-sm font-black text-card ring-2 ring-gold">地</span>
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-bold">地盤通平台</p>
-                  <p class="truncate text-xs text-muted">平台管理員 · Kelvin</p>
+  <div id="app"></div>
+
+  <script>
+    (function () {
+      "use strict";
+    // =========================================================================
+    // 地盤通 (Deitong) — Complete Single-File Edition (Full Closed Loops + Firebase + 1-Click GitHub Push)
+    // =========================================================================
+    const STORAGE_KEY = "deitong-demo-v1";
+    const GH_DEPLOY_KEY = "deitong-gh-deploy-v1";
+    const FB_CONFIG_KEY = "deitong-fb-config-v1";
+    const memStore = {};
+    function safeGet(k) { try { return safeGet(k); } catch { return memStore[k] ?? null; } }
+    function safeSet(k, v) { memStore[k] = v; try { safeSet(k, v); } catch { /* sandboxed iframe */ } }
+
+    const DEMO_NOTE = "示範模式：未連接 Firebase。資料只存在呢部瀏覽器，冇雲端，亦未做真正公司隔離。";
+    const PRICE_NOTE = "以上價錢只供展示同討論，未批准作正式定價，未接通真正付款。";
+    const SECURITY_NOTE = "而家嘅身份同權限只喺呢部瀏覽器示範。正式環境要由後端強制執行：前端藏起個掣，唔等於安全。付款狀態、套餐同用量只可以由後端改。";
+
+    const PLANS = {
+      trial:   { name: "十四日試用", price: 0,    sites: 3,  seats: 5,  gb: 20,  blurb: "試用跟入門一樣上限，試完先決定開唔開。" },
+      starter: { name: "入門",       price: 498,  sites: 3,  seats: 5,  gb: 20,  blurb: "細公司、兩三個盤同時開。" },
+      team:    { name: "團隊",       price: 1280, sites: 10, seats: 20, gb: 100, blurb: "幾個盤一起走，主管同分判都入嚟。" },
+      company: { name: "公司",       price: 2680, sites: 30, seats: 50, gb: 300, blurb: "盤多、人多，報表要一次過睇晒。" },
+    };
+    const PLAN_ORDER = ["starter", "team", "company"];
+    const ROLE_LABEL = { platform_admin: "平台管理員", company_admin: "公司管理員", project_manager: "項目經理", site_supervisor: "工地主管", subcontractor: "分判／工人" };
+    const STATUS_LABEL = { unassigned: "待分派", pending: "待處理", in_progress: "處理中", review: "待驗收", done: "已完成" };
+    const PRIORITY_LABEL = { low: "低", normal: "一般", high: "急", urgent: "即刻" };
+    const MATERIAL_LABEL = { to_order: "未落單", ordered: "已落單", delivered: "已到場", issue: "有問題" };
+    const LOG_STATE_LABEL = { none: "未寫", draft: "草稿未交", submitted: "已交" };
+    const WEATHERS = ["天晴", "陰天", "落雨", "驟雨", "酷熱"];
+    const DEFAULT_CATALOG = { processes: ["泥水批盪", "水電拉線", "木器安裝", "鋪磚", "油漆"], trades: ["泥水", "水電", "木器", "油漆", "雜工"] };
+    const DEFAULT_FEATURE_FLAGS = { logs: true, tasks: true, materials: true, files: true, reports: true, billing: true };
+    const FEATURE_LABELS = {
+      logs: { label: "每日紀錄／日誌", hint: "開關公司日誌與工人今日開工狀態入口" },
+      tasks: { label: "任務／執漏", hint: "開關任務分派、完工相與退回驗收模組" },
+      materials: { label: "材料跟進", hint: "開關工人叫料、落單與確認收貨流程" },
+      files: { label: "文件／相片", hint: "開關圖則同現場相片紀錄入口" },
+      reports: { label: "報表", hint: "開關今日未埋口同工地進度圖表" },
+      billing: { label: "套餐展示頁", hint: "開關公司端睇套餐與用量提示入口" },
+    };
+
+    function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+    function isoOffset(days) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+    function atOffset(days, hm = "09:30") { return `${isoOffset(days)}T${hm}:00`; }
+    function nowStamp() { const d = new Date(); return `${todayISO()}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`; }
+    function addDays(iso, days) { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); const dt = new Date(y || 2000, (m || 1) - 1, d || 1); dt.setDate(dt.getDate() + days); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`; }
+    function formatDate(iso) { const [y, m, d] = (iso || "").slice(0, 10).split("-").map(Number); return y && m && d ? `${y}年${m}月${d}日` : (iso || ""); }
+    function weekday(iso) { const [y, m, d] = (iso || "").slice(0, 10).split("-").map(Number); return "日一二三四五六"[new Date(y, (m || 1) - 1, d || 1).getDay()] ?? ""; }
+    function formatWhen(iso) { return `${formatDate(iso)} ${(iso || "").slice(11, 16)}`.trim(); }
+    function uid(p) { return `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; }
+    function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+    function imgSrc(path) {
+      if (!path) return "";
+      if (path.startsWith("data:") || path.startsWith("http")) return path;
+      if (path.startsWith("/photos/")) return `./public${path}`;
+      if (path.startsWith("public/")) return `./${path}`;
+      return path;
+    }
+    function imgTag(src, alt, cls) {
+      const resolved = imgSrc(src);
+      const fallback = src && src.startsWith("/photos/") ? `.${src}` : "";
+      return `<img src="${esc(resolved)}" alt="${esc(alt)}" class="${esc(cls)}" ${fallback ? `onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='${esc(fallback)}'}"` : ""} />`;
+    }
+    function siteProgress(site) { return site.trades?.length ? Math.round(site.trades.reduce((n, t) => n + t.progress, 0) / site.trades.length) : 0; }
+    function logState(logs, siteId, date) {
+      const rows = logs.filter((l) => l.siteId === siteId && l.date === date);
+      if (rows.some((l) => l.status === "submitted")) return "submitted";
+      if (rows.some((l) => l.status === "draft")) return "draft";
+      return "none";
+    }
+    function isOverdue(task, today = todayISO()) { return task.status !== "done" && task.due < today; }
+    function memberName(members, id) { return id ? (members.find((m) => m.id === id)?.name ?? "已離場") : "未指定"; }
+
+    function toast(msg, tone = "ok") {
+      const wrap = document.getElementById("toast-wrap");
+      if (!wrap) return;
+      const el = document.createElement("div");
+      el.className = `toast-item ${tone === "bad" ? "bg-clay text-paper" : "bg-navy text-paper"}`;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 220); }, 3200);
+    }
+
+    function compressPhoto(file, max = 960, quality = 0.72) {
+      return new Promise((resolve, reject) => {
+        if (!file.type.startsWith("image/")) return reject(new Error("請上載圖片"));
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          resolve({ id: uid("ph"), src: canvas.toDataURL("image/jpeg", quality), caption: file.name.replace(/\.[^.]+$/, "") });
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("讀唔到張相")); };
+        img.src = url;
+      });
+    }
+
+    // =========================================================================
+    // Seed Demo Data
+    // =========================================================================
+    function createDemoData() {
+      return {
+        companies: [
+          { id: "co-yuean", name: "裕安室內工程有限公司", shortName: "裕安", mark: "裕", trade: "室內設計及裝修工程", plan: "team", status: "active", trialEnds: null, storageUsedGb: 86 },
+          { id: "co-ching", name: "澄木設計工程", shortName: "澄木", mark: "澄", trade: "住宅翻新", plan: "starter", status: "trial", trialEnds: isoOffset(9), storageUsedGb: 18 },
+        ],
+        members: [
+          { id: "u-ops", companyId: null, name: "陳志遠", role: "platform_admin", title: "平台管理員", phone: "9000 1100", trade: null, blurb: "只睇客戶公司同訂閱，入唔到人家工地日誌。" },
+          { id: "u-y-admin", companyId: "co-yuean", name: "黃麗萍", role: "company_admin", title: "董事", phone: "9123 8801", trade: null, blurb: "裕安全部工地、人手同套餐用量。改唔到付款狀態。" },
+          { id: "u-y-pm", companyId: "co-yuean", name: "李俊傑", role: "project_manager", title: "項目經理", phone: "9234 6612", trade: null, blurb: "跟進度同報表。套餐只可以睇，唔可以改。" },
+          { id: "u-y-sup", companyId: "co-yuean", name: "張偉強", role: "site_supervisor", title: "工地主管", phone: "9345 2208", trade: null, blurb: "只睇自己負責嘅盤。雲咸街診所唔係你管。" },
+          { id: "u-y-sup2", companyId: "co-yuean", name: "周詠琪", role: "site_supervisor", title: "工地主管", phone: "9456 7730", trade: null, blurb: "只睇中環雲咸街診所。" },
+          { id: "u-y-elec", companyId: "co-yuean", name: "梁強", role: "subcontractor", title: "水電分判", phone: "9567 4419", trade: "水電", blurb: "裝修工人／水電分判。只睇派咗畀你嘅工作，睇唔到成間公司。" },
+          { id: "u-y-wood", companyId: "co-yuean", name: "陳木生", role: "subcontractor", title: "木器分判", phone: "9678 1184", trade: "木器", blurb: "裝修工人／木器分判。只睇派咗畀你嘅單。" },
+          { id: "u-c-admin", companyId: "co-ching", name: "何美儀", role: "company_admin", title: "老闆", phone: "9780 5521", trade: null, blurb: "澄木自己嘅盤。完全睇唔到裕安。" },
+        ],
+        sites: [
+          { id: "s-sea", companyId: "co-yuean", name: "海澄居 12 樓", district: "西營盤", address: "德輔道西 128 號海澄居 12 樓 A 室", client: "陳太", managerId: "u-y-pm", supervisorId: "u-y-sup", targetDate: isoOffset(48), stage: "木作", cover: "/photos/site-home.jpg", trades: [{ name: "拆建", progress: 100 }, { name: "水電", progress: 72 }, { name: "木作", progress: 58 }, { name: "油漆", progress: 20 }, { name: "執漏", progress: 10 }], assignedSubIds: ["u-y-elec", "u-y-wood"], status: "active" },
+          { id: "s-office", companyId: "co-yuean", name: "朗日顧問寫字樓", district: "觀塘", address: "開源道 68 號 22 樓全層", client: "朗日顧問有限公司", managerId: "u-y-pm", supervisorId: "u-y-sup", targetDate: isoOffset(28), stage: "間隔", cover: "/photos/site-office.jpg", trades: [{ name: "拆建", progress: 100 }, { name: "間隔", progress: 46 }, { name: "電器", progress: 30 }, { name: "地台", progress: 15 }], assignedSubIds: ["u-y-wood"], status: "active" },
+          { id: "s-duplex", companyId: "co-yuean", name: "第一城 38 座複式", district: "沙田", address: "沙田第一城 38 座 12 及 13 樓", client: "李生", managerId: "u-y-pm", supervisorId: "u-y-sup", targetDate: isoOffset(8), stage: "執漏", cover: "/photos/site-duplex.jpg", trades: [{ name: "木作", progress: 96 }, { name: "油漆", progress: 90 }, { name: "水電", progress: 88 }, { name: "執漏", progress: 54 }], assignedSubIds: ["u-y-elec"], status: "handover" },
+          { id: "s-clinic", companyId: "co-yuean", name: "雲咸街診所", district: "中環", address: "雲咸街 18 號 3 樓", client: "康柏醫療", managerId: "u-y-pm", supervisorId: "u-y-sup2", targetDate: isoOffset(80), stage: "拆建", cover: "/photos/site-clinic.jpg", trades: [{ name: "拆建", progress: 40 }, { name: "機電", progress: 8 }, { name: "醫療間隔", progress: 5 }], assignedSubIds: [], status: "active" },
+          { id: "s-tai", companyId: "co-ching", name: "太古城客廳翻新", district: "太古", address: "太古城青山台 8 樓", client: "周生", managerId: "u-c-admin", supervisorId: "u-c-admin", targetDate: isoOffset(21), stage: "油漆", cover: "/photos/hero.jpg", trades: [{ name: "油漆", progress: 60 }, { name: "木作", progress: 80 }], assignedSubIds: [], status: "active" },
+          { id: "s-wong", companyId: "co-ching", name: "黃竹坑工作室", district: "黃竹坑", address: "黃竹坑道 38 號 6 樓", client: "白日設計", managerId: "u-c-admin", supervisorId: "u-c-admin", targetDate: isoOffset(40), stage: "地台", cover: "/photos/site-office.jpg", trades: [{ name: "地台", progress: 35 }, { name: "電器", progress: 20 }], assignedSubIds: [], status: "active" },
+          { id: "s-tsuen", companyId: "co-ching", name: "荃灣舖頭", district: "荃灣", address: "眾安街 92 號地下", client: "林小姐", managerId: "u-c-admin", supervisorId: "u-c-admin", targetDate: isoOffset(15), stage: "間隔", cover: "/photos/site-clinic.jpg", trades: [{ name: "間隔", progress: 50 }, { name: "招牌位", progress: 10 }], assignedSubIds: [], status: "active" },
+        ],
+        logs: [
+          { id: "log-sea-y", companyId: "co-yuean", siteId: "s-sea", date: isoOffset(-1), weather: "天晴", authorName: "張偉強", authorId: "u-y-sup", headcount: [{ trade: "木器", count: 3 }, { trade: "水電", count: 2 }], noWork: false, work: "客廳地台釘好八成。房門套試裝，色水同板圖有出入，已叫木廠過嚟睇。", deliveries: "橡木地板 42 箱到場，放咗喺工人房。", issues: "主人房門套色差，未收貨。", photos: [{ id: "ph-sea-1", src: "/photos/site-home.jpg", caption: "客廳地台" }], status: "submitted", revisions: [{ at: atOffset(-1, "18:10"), byName: "張偉強", note: "補咗送貨備註" }], updatedAt: atOffset(-1, "18:10") },
+          { id: "log-sea-t", companyId: "co-yuean", siteId: "s-sea", date: isoOffset(0), weather: "陰天", authorName: "張偉強", authorId: "u-y-sup", headcount: [{ trade: "水電", count: 2 }], noWork: false, work: "廚房插座移位做到一半，等業主確認雪櫃位。", deliveries: "", issues: "", photos: [], status: "draft", revisions: [], updatedAt: atOffset(0, "11:20") },
+          { id: "log-off-y", companyId: "co-yuean", siteId: "s-office", date: isoOffset(-1), weather: "酷熱", authorName: "張偉強", authorId: "u-y-sup", headcount: [{ trade: "玻璃", count: 2 }], noWork: false, work: "會議室玻璃間隔未覆尺，廠未覆期，今日只係清場。", deliveries: "", issues: "玻璃尺寸未鎖定，成幅間隔拖住。", photos: [{ id: "ph-off-1", src: "/photos/site-office.jpg", caption: "間隔位" }], status: "submitted", revisions: [], updatedAt: atOffset(-1, "17:40") },
+          { id: "log-clinic", companyId: "co-yuean", siteId: "s-clinic", date: isoOffset(0), weather: "落雨", authorName: "周詠琪", authorId: "u-y-sup2", headcount: [], noWork: true, work: "", deliveries: "", issues: "業主要改診療室門口方向，等改圖，今日無施工。", photos: [], status: "submitted", revisions: [], updatedAt: atOffset(0, "08:50") },
+          { id: "log-tai", companyId: "co-ching", siteId: "s-tai", date: isoOffset(-1), weather: "天晴", authorName: "何美儀", authorId: "u-c-admin", headcount: [{ trade: "油漆", count: 2 }], noWork: false, work: "客廳天花批完第一遍，有一條舊裂要跟。", deliveries: "", issues: "天花舊裂。", photos: [], status: "submitted", revisions: [], updatedAt: atOffset(-1, "19:00") },
+        ],
+        tasks: [
+          { id: "t-socket", companyId: "co-yuean", siteId: "s-sea", kind: "task", title: "廚房插座移位", location: "廚房雪櫃側", description: "雪櫃位改完，插座要跟住移。業主未最終確認之前，先做線槽。", photos: [], donePhotos: [], assigneeId: "u-y-elec", subId: "u-y-elec", priority: "high", due: isoOffset(0), status: "in_progress", blocked: false, blockReason: "", needsRework: false, activity: [{ at: atOffset(-2, "10:00"), byName: "張偉強", action: "開咗呢張單，派畀梁強" }], updatedAt: atOffset(0, "09:15") },
+          { id: "t-door", companyId: "co-yuean", siteId: "s-sea", kind: "snag", title: "主人房門套色差", location: "主人房", description: "門套色水偏紅，同板圖唔同。木廠要換件或者重批色。", photos: [{ id: "ph-door", src: "/photos/site-home.jpg", caption: "門套" }], donePhotos: [], assigneeId: "u-y-wood", subId: "u-y-wood", priority: "high", due: isoOffset(-1), status: "review", blocked: false, blockReason: "", needsRework: false, activity: [{ at: atOffset(-1, "17:20"), byName: "陳木生", action: "交去驗收" }], updatedAt: atOffset(-1, "17:20") },
+          { id: "t-water", companyId: "co-yuean", siteId: "s-sea", kind: "task", title: "浴室防水試水", location: "客廁", description: "閉水 24 小時，合格先鋪磚。", photos: [], donePhotos: [], assigneeId: "u-y-elec", subId: "u-y-elec", priority: "high", due: isoOffset(3), status: "in_progress", blocked: false, blockReason: "", needsRework: true, activity: [{ at: atOffset(0, "08:20"), byName: "張偉強", action: "退回修改：閉水未夠二十四小時就影相，請再試水" }], updatedAt: atOffset(0, "08:20") },
+          { id: "t-glass", companyId: "co-yuean", siteId: "s-office", kind: "snag", title: "玻璃間隔覆尺", location: "會議室", description: "圖則同現場吊頂位有衝突，要覆尺先落單。", photos: [], donePhotos: [], assigneeId: null, subId: null, priority: "urgent", due: isoOffset(-3), status: "unassigned", blocked: true, blockReason: "玻璃廠未覆期", needsRework: false, activity: [{ at: atOffset(-3, "14:10"), byName: "張偉強", action: "標記受阻：玻璃廠未覆期" }], updatedAt: atOffset(-3, "14:10") },
+          { id: "t-rail", companyId: "co-yuean", siteId: "s-duplex", kind: "task", title: "樓梯扶手固定", location: "複式樓梯", description: "水電收線後先鎖黃銅扶手，鎖完交業主驗。", photos: [], donePhotos: [], assigneeId: "u-y-elec", subId: "u-y-elec", priority: "high", due: isoOffset(0), status: "review", blocked: false, blockReason: "", needsRework: false, activity: [{ at: atOffset(0, "10:40"), byName: "梁強", action: "交去驗收" }], updatedAt: atOffset(0, "10:40") },
+          { id: "t-skirting", companyId: "co-yuean", siteId: "s-sea", kind: "task", title: "客廳地腳線收口", location: "客廳", description: "地板釘完先收地腳線，轉角要對紋。", photos: [], donePhotos: [], assigneeId: "u-y-wood", subId: "u-y-wood", priority: "normal", due: isoOffset(2), status: "in_progress", blocked: false, blockReason: "", needsRework: false, activity: [{ at: atOffset(-1, "12:00"), byName: "張偉強", action: "派畀陳木生" }], updatedAt: atOffset(-1, "12:00") },
+          { id: "t-doorway", companyId: "co-yuean", siteId: "s-clinic", kind: "snag", title: "診療室門口改向", location: "診療室", description: "業主想門向走廊開，等改圖先拆。", photos: [], donePhotos: [], assigneeId: "u-y-sup2", subId: null, priority: "high", due: isoOffset(5), status: "pending", blocked: true, blockReason: "等改圖", needsRework: false, activity: [{ at: atOffset(0, "08:45"), byName: "周詠琪", action: "標記受阻：等改圖" }], updatedAt: atOffset(0, "08:45") },
+          { id: "t-crack", companyId: "co-ching", siteId: "s-tai", kind: "snag", title: "客廳天花舊裂", location: "客廳天花", description: "舊裂要切開補，唔好只掃漆蓋住。", photos: [], donePhotos: [], assigneeId: "u-c-admin", subId: null, priority: "normal", due: isoOffset(2), status: "pending", blocked: false, blockReason: "", needsRework: false, activity: [{ at: atOffset(-1, "19:10"), byName: "何美儀", action: "開咗執漏" }], updatedAt: atOffset(-1, "19:10") },
+          { id: "t-floor", companyId: "co-ching", siteId: "s-wong", kind: "task", title: "地台找平", location: "工作室地台", description: "高低差超過 8mm，要先找平。", photos: [], donePhotos: [], assigneeId: null, subId: null, priority: "high", due: isoOffset(1), status: "unassigned", blocked: false, blockReason: "", needsRework: false, activity: [{ at: atOffset(-2, "11:00"), byName: "何美儀", action: "開咗呢張單" }], updatedAt: atOffset(-2, "11:00") },
+        ],
+        materials: [
+          { id: "m-oak", companyId: "co-yuean", siteId: "s-sea", name: "橡木地板", spec: "190×1900 自然色", qty: "120 平方米", supplier: "森木行", status: "ordered", neededBy: isoOffset(2), note: "已到 42 箱，餘數下週。", updatedAt: atOffset(-1, "18:00") },
+          { id: "m-glass", companyId: "co-yuean", siteId: "s-office", name: "間隔玻璃", spec: "12mm 清玻，高度待覆", qty: "18 塊", supplier: "明玻廠", status: "issue", neededBy: isoOffset(-1), note: "尺寸未鎖定，唔好落單。", updatedAt: atOffset(-3, "14:00") },
+          { id: "m-paint", companyId: "co-ching", siteId: "s-tai", name: "天花防裂網", spec: "玻璃纖維網", qty: "1 卷", supplier: "漆料店", status: "to_order", neededBy: isoOffset(1), note: "", updatedAt: atOffset(-1, "19:20") },
+        ],
+        files: [
+          { id: "f-plan-sea", companyId: "co-yuean", siteId: "s-sea", name: "海澄居平面圖 R3", kind: "drawing", note: "示範圖則，未上載實檔。", src: null, updatedAt: atOffset(-10, "10:00") },
+          { id: "f-photo-sea", companyId: "co-yuean", siteId: "s-sea", name: "客廳現場相", kind: "photo", note: "昨日收工影。", src: "/photos/site-home.jpg", updatedAt: atOffset(-1, "18:12") },
+          { id: "f-tai", companyId: "co-ching", siteId: "s-tai", name: "太古客廳相", kind: "photo", note: "", src: "/photos/hero.jpg", updatedAt: atOffset(-1, "19:00") },
+        ],
+        audits: [
+          { id: "a-yuean", at: atOffset(-24, "10:00"), companyId: "co-yuean", byName: "後端", note: "將裕安由十四日試用轉做團隊方案。" },
+          { id: "a-ching", at: atOffset(-5, "15:30"), companyId: "co-ching", byName: "後端", note: "澄木開咗十四日試用，上限跟入門。" },
+        ],
+        checkins: [],
+        nudges: [{ id: "n-office", companyId: "co-yuean", siteId: "s-office", date: isoOffset(0), byName: "黃麗萍", note: "寫字樓今日未見日誌。收工前記低玻璃覆尺結果。", at: atOffset(0, "08:40"), resolvedAt: null }],
+        dayCloses: [],
+        instructions: [{ id: "ins-sea", companyId: "co-yuean", siteId: "s-sea", byName: "李俊傑", text: "大廳木作今晚清走木糠，聽日油漆師傅入嚟。", at: atOffset(0, "08:10"), ackByName: null, ackAt: null }],
+        touches: [],
+        catalog: { processes: [...DEFAULT_CATALOG.processes], trades: [...DEFAULT_CATALOG.trades] },
+        featureFlags: { ...DEFAULT_FEATURE_FLAGS },
+        sessionUserId: null,
+      };
+    }
+
+    // =========================================================================
+    // Permissions: canSeeSite / canSeeTask / can() — enforced on EVERY write
+    // =========================================================================
+    function canSeeSite(user, site) {
+      if (!user || !site || user.role === "platform_admin" || user.companyId !== site.companyId) return false;
+      if (user.role === "company_admin" || user.role === "project_manager") return true;
+      if (user.role === "site_supervisor") return site.supervisorId === user.id;
+      return Array.isArray(site.assignedSubIds) && site.assignedSubIds.includes(user.id);
+    }
+    function canSeeTask(user, task, site) {
+      if (!site || !canSeeSite(user, site)) return false;
+      if (user.role === "subcontractor") return task.assigneeId === user.id || task.subId === user.id;
+      return true;
+    }
+    function can(user, action, site) {
+      if (!user) return false;
+      if (user.role === "platform_admin") return action === "manage_billing" || action === "view_admin" || action === "view_billing";
+      if (site && (user.companyId !== site.companyId || !canSeeSite(user, site))) return false;
+      const r = user.role;
+      switch (action) {
+        case "view_admin": case "manage_billing": return false;
+        case "view_billing": case "view_reports": return r === "company_admin" || r === "project_manager" || r === "site_supervisor";
+        case "view_people": return r !== "subcontractor";
+        case "manage_people": return r === "company_admin";
+        case "assign_sub": case "create_site": case "nudge_log": case "instruct": return r === "company_admin" || r === "project_manager";
+        case "edit_site": case "create_log": case "edit_log": case "approve_task": case "create_material": case "edit_material": case "upload_file": case "close_day":
+          return r === "company_admin" || r === "project_manager" || r === "site_supervisor";
+        case "create_task": case "update_task": case "request_material": case "check_in": return true;
+        default: return false;
+      }
+    }
+
+    // =========================================================================
+    // Store & Legacy localStorage (deitong-demo-v1) Merge
+    // =========================================================================
+    function loadStore() {
+      const base = createDemoData();
+      try {
+        const raw = safeGet(STORAGE_KEY);
+        if (!raw) return base;
+        const parsed = JSON.parse(raw);
+        const saved = parsed?.state ?? parsed ?? {};
+        return {
+          ...base,
+          ...saved,
+          checkins: Array.isArray(saved.checkins) ? saved.checkins : base.checkins,
+          nudges: Array.isArray(saved.nudges) ? saved.nudges : base.nudges,
+          dayCloses: Array.isArray(saved.dayCloses) ? saved.dayCloses : base.dayCloses,
+          instructions: Array.isArray(saved.instructions) ? saved.instructions : base.instructions,
+          touches: Array.isArray(saved.touches) ? saved.touches : base.touches,
+          catalog: saved.catalog && Array.isArray(saved.catalog.processes) && Array.isArray(saved.catalog.trades) ? saved.catalog : base.catalog,
+          featureFlags: { ...DEFAULT_FEATURE_FLAGS, ...(saved.featureFlags ?? {}) },
+        };
+      } catch { return base; }
+    }
+
+    let state = loadStore();
+    let runtime = {
+      authMode: "demo",
+      cloudEmail: null,
+      cloudStatus: "offline",
+      moreOpen: false,
+      adminTab: "features",
+      siteTab: "overview",
+      taskFilter: "全部",
+      modal: null, // null | { type: "log", siteId, editId } | { type: "task", kind, siteId } | { type: "taskDetail", taskId, pendingPhotos: [] } | { type: "material", siteId } | { type: "workerMat" } | { type: "site" } | { type: "person" }
+      fbApp: null, fbAuth: null, fbDb: null,
+    };
+
+    function saveStore() {
+      try { safeSet(STORAGE_KEY, JSON.stringify({ state, version: 0 })); } catch { /* ignore */ }
+    }
+
+    // =========================================================================
+    // Firebase Lazy ESM Loader & Cloud Sync
+    // =========================================================================
+    function getSavedFbConfig() {
+      const def = { apiKey: "", authDomain: "renocamp-site.firebaseapp.com", projectId: "renocamp-site", storageBucket: "renocamp-site.firebasestorage.app", messagingSenderId: "544840282779", appId: "1:544840282779:web:a22ea9d881b1c595ea0c3e" };
+      try { return { ...def, ...(JSON.parse(safeGet(FB_CONFIG_KEY) || "{}")) }; } catch { return def; }
+    }
+    function hasFbConfig(cfg = getSavedFbConfig()) { return Boolean(cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId); }
+
+    let fbMods = null;
+    async function initFirebaseIfReady() {
+      const cfg = getSavedFbConfig();
+      if (!hasFbConfig(cfg)) return null;
+      if (runtime.fbApp) return { app: runtime.fbApp, auth: runtime.fbAuth, db: runtime.fbDb, mods: fbMods };
+      const [appMod, authMod, fsMod] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js"),
+        import("https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js"),
+      ]);
+      fbMods = { appMod, authMod, fsMod };
+      const apps = appMod.getApps();
+      runtime.fbApp = apps.length ? apps[0] : appMod.initializeApp(cfg);
+      runtime.fbAuth = authMod.getAuth(runtime.fbApp);
+      runtime.fbDb = fsMod.getFirestore(runtime.fbApp);
+      authMod.onAuthStateChanged(runtime.fbAuth, (fbUser) => { if (fbUser) void hydrateCloudUser(fbUser); });
+      return { app: runtime.fbApp, auth: runtime.fbAuth, db: runtime.fbDb, mods: fbMods };
+    }
+
+    async function cloudWrite(pathSegments, data) {
+      if (runtime.authMode !== "firebase" || !runtime.fbDb || !fbMods) return;
+      try { await fbMods.fsMod.setDoc(fbMods.fsMod.doc(runtime.fbDb, ...pathSegments), data, { merge: true }); } catch { /* rules enforced */ }
+    }
+
+    async function hydrateCloudUser(fbUser) {
+      if (!fbMods || !runtime.fbDb) return;
+      const { fsMod } = fbMods;
+      const token = await fbUser.getIdTokenResult();
+      let role = token.claims.role || null;
+      let companyId = token.claims.companyId || null;
+      let name = fbUser.displayName || (fbUser.email || "").split("@")[0] || "用戶";
+      try {
+        const snap = await fsMod.getDoc(fsMod.doc(runtime.fbDb, "users", fbUser.uid));
+        if (snap.exists()) {
+          const d = snap.data();
+          if (!role && d.role) role = d.role;
+          if (!companyId && d.companyId) companyId = d.companyId;
+          if (d.name) name = d.name;
+        }
+      } catch { /* fallback */ }
+      if (!role) return;
+      const member = { id: fbUser.uid, companyId: role === "platform_admin" ? null : companyId, name, role, title: ROLE_LABEL[role] || "成員", phone: "已驗證", trade: null, blurb: `Firebase 雲端帳戶（${fbUser.email || ""}）` };
+      if (!state.members.some((m) => m.id === member.id)) state.members.push(member);
+      else state.members = state.members.map((m) => (m.id === member.id ? member : m));
+      state.sessionUserId = member.id;
+      runtime.authMode = "firebase";
+      runtime.cloudEmail = fbUser.email || "";
+      runtime.cloudStatus = "connected";
+      saveStore();
+      render();
+    }
+
+    async function cloudLogin(email, password) {
+      if (!hasFbConfig()) return { ok: false, error: "請先去超級管理員「Firebase 設定」貼上 apiKey 並儲存。" };
+      if (!email.trim() || !password) return { ok: false, error: "請輸入電郵同密碼。" };
+      try {
+        const fb = await initFirebaseIfReady();
+        const cred = await fb.mods.authMod.signInWithEmailAndPassword(fb.auth, email.trim(), password);
+        await hydrateCloudUser(cred.user);
+        if (runtime.authMode !== "firebase") { await fb.mods.authMod.signOut(fb.auth); return { ok: false, error: "此帳戶尚未喺 Firestore /users/{uid} 設定 role。" }; }
+        return { ok: true };
+      } catch (err) { return { ok: false, error: err?.message || "登入失敗，請檢查電郵同密碼。" }; }
+    }
+
+    // =========================================================================
+    // Scope & Store Mutations (every write double-checked via can())
+    // =========================================================================
+    function getUser() { return state.members.find((m) => m.id === state.sessionUserId) ?? null; }
+    function getScope() {
+      const user = getUser();
+      const company = state.companies.find((c) => c.id === user?.companyId) ?? null;
+      const sites = user ? state.sites.filter((s) => canSeeSite(user, s)) : [];
+      const siteMap = new Map(state.sites.map((s) => [s.id, s]));
+      const tasks = user ? state.tasks.filter((t) => canSeeTask(user, t, siteMap.get(t.siteId))) : [];
+      const siteIds = new Set(sites.map((s) => s.id));
+      const logs = state.logs.filter((l) => siteIds.has(l.siteId)).map((l) => (user?.role === "subcontractor" ? { ...l, work: "", deliveries: "", issues: "", headcount: [], photos: [], revisions: [] } : l));
+      const materials = state.materials.filter((m) => siteIds.has(m.siteId));
+      const files = state.files.filter((f) => siteIds.has(f.siteId));
+      const people = !user ? [] : user.role === "subcontractor" ? state.members.filter((m) => m.id === user.id) : state.members.filter((m) => m.companyId === user.companyId);
+      return {
+        user, company, sites, tasks, logs, materials, files, people,
+        checkins: state.checkins.filter((r) => siteIds.has(r.siteId)),
+        nudges: state.nudges.filter((r) => siteIds.has(r.siteId)),
+        dayCloses: state.dayCloses.filter((r) => siteIds.has(r.siteId)),
+        instructions: state.instructions.filter((r) => siteIds.has(r.siteId)),
+        touches: user?.role === "platform_admin" ? state.touches : state.touches.filter((r) => r.companyId === user?.companyId),
+      };
+    }
+
+    function mutSaveLog(input) {
+      const user = getUser();
+      const site = state.sites.find((s) => s.id === input.siteId);
+      if (!user || !site) return { ok: false, error: "搵唔到工地" };
+      const editing = input.id ? state.logs.find((l) => l.id === input.id) : null;
+      if (input.id && !editing) return { ok: false, error: "搵唔到呢份日誌" };
+      if (editing && (editing.companyId !== site.companyId || editing.siteId !== site.id)) return { ok: false, error: "你冇權限改呢份日誌" };
+      if (!can(user, editing ? "edit_log" : "create_log", site)) return { ok: false, error: "你冇權限寫呢個工地嘅日誌" };
+      if (!input.date || !input.authorName.trim()) return { ok: false, error: "請填日期同填寫人" };
+      if (!input.noWork && !input.work.trim()) return { ok: false, error: "請寫今日做咗咩，或者剔「今日無施工」" };
+      const stamp = nowStamp();
+      const headcount = (input.headcount || []).filter((h) => h.trade.trim() && h.count > 0);
+      const isSubmitted = Boolean(input.submit) || editing?.status === "submitted";
+      let savedLog;
+      if (editing) {
+        const revs = [...(editing.revisions || [])];
+        if (editing.status === "submitted" || input.submit) revs.push({ at: stamp, byName: user.name, note: input.submit && editing.status === "draft" ? "由草稿提交" : "改過內容" });
+        Object.assign(editing, { date: input.date, weather: input.weather || "天晴", authorName: input.authorName.trim(), headcount, noWork: input.noWork, work: input.noWork ? "" : input.work.trim(), deliveries: input.deliveries.trim(), issues: input.issues.trim(), status: isSubmitted ? "submitted" : "draft", revisions: revs, updatedAt: stamp });
+        savedLog = editing;
+      } else {
+        savedLog = { id: uid("log"), companyId: site.companyId, siteId: site.id, date: input.date, weather: input.weather || "天晴", authorName: input.authorName.trim(), authorId: user.id, headcount, noWork: input.noWork, work: input.noWork ? "" : input.work.trim(), deliveries: input.deliveries.trim(), issues: input.issues.trim(), photos: [], status: input.submit ? "submitted" : "draft", revisions: [], updatedAt: stamp };
+        state.logs.unshift(savedLog);
+      }
+      if (isSubmitted) {
+        state.nudges = state.nudges.map((n) => (n.siteId === site.id && n.date === input.date && !n.resolvedAt ? { ...n, resolvedAt: stamp } : n));
+      }
+      saveStore();
+      void cloudWrite(["companies", savedLog.companyId, "sites", savedLog.siteId, "logs", savedLog.id], savedLog);
+      return { ok: true };
+    }
+
+    function mutSaveTask(input) {
+      const user = getUser();
+      const site = state.sites.find((s) => s.id === input.siteId);
+      if (!user || !site || !can(user, "create_task", site)) return { ok: false, error: "你冇權限喺呢個工地開單" };
+      if (!input.title.trim() || !input.due) return { ok: false, error: "請寫標題同期限" };
+      let assigneeId = input.assigneeId || null;
+      let subId = null;
+      if (user.role === "subcontractor") {
+        if (assigneeId && assigneeId !== user.id) return { ok: false, error: "分判唔可以派單畀其他人" };
+        assigneeId = user.id;
+        subId = user.id;
+      }
+      const person = assigneeId ? state.members.find((m) => m.id === assigneeId) : null;
+      if (assigneeId && (!person || person.companyId !== site.companyId)) return { ok: false, error: "呢個人唔係呢間公司" };
+      if (person?.role === "subcontractor") subId = person.id;
+      let warning = "";
+      if (person?.role === "subcontractor" && !site.assignedSubIds.includes(person.id)) {
+        site.assignedSubIds.push(person.id);
+        warning = `已將${person.name}加入${site.name}。`;
+      }
+      const stamp = nowStamp();
+      const task = { id: uid("task"), companyId: site.companyId, siteId: site.id, kind: input.kind || "task", title: input.title.trim(), location: (input.location || "").trim(), description: (input.description || "").trim(), photos: [], donePhotos: [], assigneeId, subId, priority: input.priority || "normal", due: input.due, status: assigneeId ? "pending" : "unassigned", blocked: false, blockReason: "", needsRework: false, activity: [{ at: stamp, byName: user.name, action: assigneeId ? "開咗呢張單，並分派" : "開咗呢張單，未分派" }], updatedAt: stamp };
+      state.tasks.unshift(task);
+      saveStore();
+      void cloudWrite(["companies", task.companyId, "sites", task.siteId, "tasks", task.id], task);
+      return { ok: true, warning };
+    }
+
+    function mutActTask(taskId, cmd) {
+      const user = getUser();
+      const task = state.tasks.find((t) => t.id === taskId);
+      const site = task ? state.sites.find((s) => s.id === task.siteId) : null;
+      if (!user || !task || !site || !canSeeTask(user, task, site)) return { ok: false, error: "你冇權限睇呢張單" };
+      const stamp = nowStamp();
+      const push = (a) => task.activity.push({ at: stamp, byName: user.name, action: a });
+      let warning = "";
+      if (cmd.type === "assign") {
+        if (!can(user, "approve_task", site)) return { ok: false, error: "分判唔可以改派" };
+        const person = state.members.find((m) => m.id === cmd.assigneeId);
+        if (!person || person.companyId !== site.companyId) return { ok: false, error: "呢個人唔係呢間公司" };
+        task.assigneeId = person.id;
+        if (person.role === "subcontractor") {
+          task.subId = person.id;
+          if (!site.assignedSubIds.includes(person.id)) { site.assignedSubIds.push(person.id); warning = `已將${person.name}加入${site.name}。`; }
+        }
+        if (task.status === "unassigned") task.status = "pending";
+        push(`改派畀${person.name}`);
+      } else if (cmd.type === "start") {
+        if (!can(user, "update_task", site)) return { ok: false, error: "冇權限" };
+        if (task.status === "done" || task.status === "review") return { ok: false, error: "呢張單而家唔可以重新開工" };
+        task.status = "in_progress";
+        if (!task.assigneeId) task.assigneeId = user.id;
+        push("開始處理");
+      } else if (cmd.type === "review") {
+        if (!can(user, "update_task", site)) return { ok: false, error: "冇權限" };
+        if (task.status !== "in_progress" && task.status !== "pending") return { ok: false, error: "未開始交唔到去驗收" };
+        task.status = "review";
+        task.needsRework = false;
+        if (cmd.donePhotos?.length) task.donePhotos.push(...cmd.donePhotos);
+        push(cmd.donePhotos?.length ? "交去驗收，附上完工相" : "交去驗收");
+      } else if (cmd.type === "approve") {
+        if (!can(user, "approve_task", site)) return { ok: false, error: "驗收要主管、經理或老闆先得" };
+        if (task.blocked) return { ok: false, error: "受阻緊，未可以驗收" };
+        if (task.status !== "review") return { ok: false, error: "未交到驗收" };
+        task.status = "done";
+        task.needsRework = false;
+        push("驗收完成");
+      } else if (cmd.type === "return") {
+        if (!can(user, "approve_task", site)) return { ok: false, error: "退回要主管、經理或老闆先得" };
+        if (!cmd.note?.trim()) return { ok: false, error: "請寫退回原因" };
+        if (task.status !== "review") return { ok: false, error: "呢張單唔係待驗收" };
+        task.status = "in_progress";
+        task.needsRework = true;
+        push(`退回修改：${cmd.note.trim()}`);
+      } else if (cmd.type === "block") {
+        if (!can(user, "update_task", site) || task.status === "done") return { ok: false, error: "無法標記受阻" };
+        if (!cmd.reason?.trim()) return { ok: false, error: "請寫受阻原因" };
+        task.blocked = true;
+        task.blockReason = cmd.reason.trim();
+        push(`標記受阻：${task.blockReason}`);
+      } else if (cmd.type === "unblock") {
+        if (!can(user, "update_task", site)) return { ok: false, error: "冇權限" };
+        task.blocked = false;
+        task.blockReason = "";
+        push("解除受阻");
+      }
+      task.updatedAt = stamp;
+      saveStore();
+      void cloudWrite(["companies", task.companyId, "sites", task.siteId, "tasks", task.id], task);
+      return { ok: true, warning };
+    }
+
+    function mutSaveMaterial(input, isWorkerRequest = false) {
+      const user = getUser();
+      const site = state.sites.find((s) => s.id === input.siteId);
+      if (!user || !site) return { ok: false, error: "請揀工地" };
+      if (!can(user, isWorkerRequest ? "request_material" : "create_material", site)) return { ok: false, error: "你冇權限喺呢個盤叫料" };
+      if (!input.name.trim() || !input.qty.trim()) return { ok: false, error: "請寫材料名同數量" };
+      const item = {
+        id: uid("mat"), companyId: site.companyId, siteId: site.id, name: input.name.trim(), spec: (input.spec || "").trim(), qty: input.qty.trim(), supplier: (input.supplier || "").trim(),
+        status: isWorkerRequest ? "to_order" : (input.status || "to_order"), neededBy: input.neededBy || todayISO(),
+        note: isWorkerRequest ? `工人叫料：${user.name}${input.note?.trim() ? ` · ${input.note.trim()}` : ""}` : (input.note || "").trim(),
+        updatedAt: nowStamp(),
+      };
+      state.materials.unshift(item);
+      saveStore();
+      void cloudWrite(["companies", item.companyId, "sites", item.siteId, "materials", item.id], item);
+      return { ok: true };
+    }
+
+    function mutSetMaterialStatus(id, status) {
+      const user = getUser();
+      const item = state.materials.find((m) => m.id === id);
+      const site = item ? state.sites.find((s) => s.id === item.siteId) : null;
+      if (!user || !item || !site || !can(user, "edit_material", site)) return { ok: false, error: "你冇權限改材料狀態" };
+      item.status = status;
+      item.updatedAt = nowStamp();
+      saveStore();
+      void cloudWrite(["companies", item.companyId, "sites", item.siteId, "materials", item.id], item);
+      return { ok: true };
+    }
+
+    function mutConfirmMaterial(id) {
+      const user = getUser();
+      const item = state.materials.find((m) => m.id === id);
+      const site = item ? state.sites.find((s) => s.id === item.siteId) : null;
+      if (!user || !item || !site || !canSeeSite(user, site)) return { ok: false, error: "你睇唔到呢張單" };
+      if (user.role !== "subcontractor") return { ok: false, error: "收貨由叫料嘅工人確認" };
+      if (!item.note.startsWith(`工人叫料：${user.name}`)) return { ok: false, error: "呢張唔係你叫嘅" };
+      if (item.status !== "ordered") return { ok: false, error: "公司未落單。落咗單、貨到咗先確認。" };
+      item.status = "delivered";
+      item.note = `${item.note} · ${user.name}確認收到`;
+      item.updatedAt = nowStamp();
+      saveStore();
+      void cloudWrite(["companies", item.companyId, "sites", item.siteId, "materials", item.id], item);
+      return { ok: true };
+    }
+
+    function mutArrive(siteId) {
+      const user = getUser(), site = state.sites.find((s) => s.id === siteId);
+      if (!user || !site || !can(user, "check_in", site)) return { ok: false, error: "你唔係呢個盤嘅人" };
+      const date = todayISO(), stamp = nowStamp();
+      const ex = state.checkins.find((r) => r.siteId === siteId && r.memberId === user.id && r.date === date);
+      if (ex && !ex.leftAt && !ex.absent) return { ok: false, error: "你已經報到，未收工。" };
+      if (ex) Object.assign(ex, { leftAt: null, arrivedAt: stamp, absent: false, note: "" });
+      else state.checkins.unshift({ id: uid("in"), companyId: site.companyId, siteId, memberId: user.id, memberName: user.name, trade: user.trade || user.title, date, arrivedAt: stamp, leftAt: null, note: "", absent: false });
+      saveStore();
+      return { ok: true };
+    }
+    function mutLeave(siteId, note = "") {
+      const user = getUser(), site = state.sites.find((s) => s.id === siteId);
+      if (!user || !site || !can(user, "check_in", site)) return { ok: false, error: "你唔係呢個盤嘅人" };
+      const row = state.checkins.find((r) => r.siteId === siteId && r.memberId === user.id && r.date === todayISO() && !r.leftAt && !r.absent);
+      if (!row) return { ok: false, error: "你今日未報到，或者已經收工。" };
+      row.leftAt = nowStamp(); row.note = note.trim(); saveStore(); return { ok: true };
+    }
+    function mutAbsent(siteId, reason) {
+      const user = getUser(), site = state.sites.find((s) => s.id === siteId);
+      if (!user || !site || !can(user, "check_in", site)) return { ok: false, error: "你唔係呢個盤嘅人" };
+      if (!reason.trim()) return { ok: false, error: "寫低點解今日去唔到" };
+      const ex = state.checkins.find((r) => r.siteId === siteId && r.memberId === user.id && r.date === todayISO());
+      if (ex && !ex.leftAt && !ex.absent) return { ok: false, error: "你已經喺場。要走先收工，唔好標去唔到。" };
+      if (ex) return { ok: false, error: ex.absent ? "你已經話過今日去唔到。" : "你今日已經收過工。" };
+      const stamp = nowStamp();
+      state.checkins.unshift({ id: uid("in"), companyId: site.companyId, siteId, memberId: user.id, memberName: user.name, trade: user.trade || user.title, date: todayISO(), arrivedAt: stamp, leftAt: stamp, note: reason.trim(), absent: true });
+      saveStore(); return { ok: true };
+    }
+    function mutNudge(siteId, note) {
+      const user = getUser(), site = state.sites.find((s) => s.id === siteId);
+      if (!user || !site || !can(user, "nudge_log", site)) return { ok: false, error: "只有老闆同項目經理可以催交" };
+      if (!note.trim()) return { ok: false, error: "寫低想主管交咩" };
+      const date = todayISO();
+      if (logState(state.logs, siteId, date) === "submitted") return { ok: false, error: "呢個盤今日日誌已交" };
+      state.nudges.unshift({ id: uid("nudge"), companyId: site.companyId, siteId, date, byName: user.name, note: note.trim(), at: nowStamp(), resolvedAt: null });
+      saveStore(); return { ok: true };
+    }
+    function mutInstruct(siteId, text) {
+      const user = getUser(), site = state.sites.find((s) => s.id === siteId);
+      if (!user || !site || !can(user, "instruct", site)) return { ok: false, error: "只有老闆同項目經理可以落指示" };
+      if (!text.trim()) return { ok: false, error: "寫低指示" };
+      state.instructions.unshift({ id: uid("ins"), companyId: site.companyId, siteId, byName: user.name, text: text.trim(), at: nowStamp(), ackByName: null, ackAt: null });
+      saveStore(); return { ok: true };
+    }
+    function mutAckInstruction(id) {
+      const user = getUser(), item = state.instructions.find((r) => r.id === id);
+      const site = item ? state.sites.find((s) => s.id === item.siteId) : null;
+      if (!user || !item || !site || !can(user, "close_day", site)) return { ok: false, error: "指示由主管回覆" };
+      item.ackByName = user.name; item.ackAt = nowStamp(); saveStore(); return { ok: true };
+    }
+    function mutCloseDay(siteId, note) {
+      const user = getUser(), site = state.sites.find((s) => s.id === siteId);
+      if (!user || !site || !can(user, "close_day", site)) return { ok: false, error: "你冇權限幫呢個盤收工" };
+      if (!note.trim()) return { ok: false, error: "寫低今日有咩要交帶" };
+      const date = todayISO();
+      if (logState(state.logs, siteId, date) !== "submitted") return { ok: false, error: "未交今日日誌。提交咗先算收工。" };
+      const openReviews = state.tasks.filter((t) => t.siteId === siteId && t.status === "review").length;
+      const ex = state.dayCloses.find((r) => r.siteId === siteId && r.date === date);
+      const row = { id: ex?.id ?? uid("close"), companyId: site.companyId, siteId, date, byName: user.name, note: note.trim(), at: nowStamp(), openReviews };
+      if (ex) Object.assign(ex, row); else state.dayCloses.unshift(row);
+      saveStore();
+      return { ok: true, warning: openReviews ? `已收工。仲有 ${openReviews} 張單等驗收。` : "" };
+    }
+    function mutSaveSite(input) {
+      const user = getUser();
+      if (!user || !user.companyId || !can(user, "create_site")) return { ok: false, error: "只有老闆同項目經理可以開工地" };
+      if (!input.name.trim() || !input.address.trim() || !input.client.trim() || !input.targetDate || !input.supervisorId) return { ok: false, error: "請填齊工地名、地址、客戶、主管同目標完工日" };
+      const sup = state.members.find((m) => m.id === input.supervisorId && m.companyId === user.companyId);
+      if (!sup) return { ok: false, error: "負責人唔係呢間公司嘅人" };
+      const covers = ["/photos/site-home.jpg", "/photos/site-office.jpg", "/photos/site-duplex.jpg", "/photos/site-clinic.jpg"];
+      const count = state.sites.filter((s) => s.companyId === user.companyId).length;
+      const site = { id: uid("site"), companyId: user.companyId, name: input.name.trim(), district: input.district.trim() || "香港", address: input.address.trim(), client: input.client.trim(), managerId: user.id, supervisorId: sup.id, targetDate: input.targetDate, stage: input.stage.trim() || "開工", cover: covers[count % covers.length], trades: [{ name: "拆建", progress: 0 }, { name: "水電", progress: 0 }, { name: "木作", progress: 0 }, { name: "油漆", progress: 0 }], assignedSubIds: [], status: "active" };
+      state.sites.unshift(site);
+      saveStore();
+      void cloudWrite(["companies", site.companyId, "sites", site.id], site);
+      return { ok: true };
+    }
+    function mutAddMember(input) {
+      const user = getUser();
+      if (!user || !user.companyId || !can(user, "manage_people")) return { ok: false, error: "只有公司老闆可以加人手" };
+      if (!input.name.trim()) return { ok: false, error: "請填姓名" };
+      if (input.role === "subcontractor" && !input.trade.trim()) return { ok: false, error: "分判請填工種" };
+      const m = { id: uid("user"), companyId: user.companyId, name: input.name.trim(), role: input.role, title: input.role === "subcontractor" ? `${input.trade.trim()}分判` : ROLE_LABEL[input.role], phone: input.phone.trim() || "未填", trade: input.role === "subcontractor" ? input.trade.trim() : null, blurb: "公司加入嘅成員。" };
+      state.members.push(m);
+      saveStore();
+      return { ok: true };
+    }
+
+    // =========================================================================
+    // Hash Router & Shared UI Helpers
+    // =========================================================================
+    let currentPath = (() => {
+      try {
+        const raw = (location.hash || "#/").replace(/^#/, "");
+        return raw.startsWith("/") ? raw : `/${raw}`;
+      } catch { return "/"; }
+    })();
+    function getPath() { return currentPath; }
+    function go(path) {
+      currentPath = path.startsWith("/") ? path : `/${path}`;
+      runtime.moreOpen = false;
+      runtime.modal = null;
+      try { if (location.hash !== `#${currentPath}`) location.hash = `#${currentPath}`; } catch {}
+      render();
+    }
+    window.addEventListener("hashchange", () => {
+      try {
+        const raw = (location.hash || "#/").replace(/^#/, "");
+        const next = raw.startsWith("/") ? raw : `/${raw}`;
+        if (next !== currentPath) { currentPath = next; runtime.moreOpen = false; runtime.modal = null; render(); }
+      } catch {}
+    });
+
+    function bannerHtml() {
+      if (runtime.authMode === "firebase") {
+        return `<p class="bg-navy px-4 py-2 text-center text-xs leading-5 text-gold" data-testid="cloud-banner">已連接 Firebase（${esc(getSavedFbConfig().projectId || "renocamp-site")}）· 雲端帳戶：${esc(runtime.cloudEmail || "已登入")} · 資料即時同步並按公司隔離</p>`;
+      }
+      return `<p class="bg-navy px-4 py-2 text-center text-xs leading-5 text-paper" data-testid="demo-banner">${esc(DEMO_NOTE)}</p>`;
+    }
+    function brandMark(size = "md") {
+      const s = size === "lg" ? "size-14" : size === "sm" ? "size-9" : "size-11";
+      return `<span class="grid ${s} shrink-0 overflow-hidden rounded-full ring-2 ring-gold">${imgTag("/photos/mascot.jpg", "地盤通師傅仔", "size-full scale-105 object-cover")}</span>`;
+    }
+    function loopRailHtml(kicker, items) {
+      const firstFail = items.findIndex((x) => !x.pass);
+      const steps = items.map((x, i) => ({ ...x, state: firstFail === -1 || i < firstFail ? "done" : i === firstFail ? "now" : "wait" }));
+      const cur = steps.find((s) => s.state === "now");
+      return `<div class="rounded-3xl border border-line bg-card p-4 shadow-card" data-testid="loop-rail">
+        <p class="text-xs font-bold text-gold-2">今日閉環</p><p class="text-xl font-black">${esc(kicker)}</p>
+        <ol class="mt-3">${steps.map((step, i) => {
+          const cls = step.state === "done" ? "bg-navy text-paper" : step.state === "now" ? "bg-gold text-ink" : "bg-paper-2 text-muted";
+          return `<li class="flex gap-3"><div class="flex flex-col items-center"><span class="grid size-8 shrink-0 place-items-center rounded-full text-xs font-black ${cls}">${step.state === "done" ? "✓" : i + 1}</span>${i < steps.length - 1 ? `<span class="min-h-4 w-0.5 flex-1 ${step.state === "done" ? "bg-navy" : "bg-line"}"></span>` : ""}</div><div class="pb-3"><p class="text-sm font-bold ${step.state === "wait" ? "text-muted" : ""}">${esc(step.label)}</p><p class="text-xs text-muted">${esc(step.hint)}</p></div></li>`;
+        }).join("")}</ol>
+        <p class="text-sm font-bold">${cur ? `而家做：${esc(cur.label)}` : "今日呢圈埋咗口。"}</p>
+      </div>`;
+    }
+    function deniedHtml() {
+      return `<div class="rounded-3xl border border-line bg-card p-6 shadow-card"><h1 class="text-2xl font-black">呢度你入唔到</h1><p class="mt-2 text-sm text-muted">你嘅身份只可以睇獲分派嘅工作。前端藏起個掣唔算安全，所以呢頁自己都會拒絕。</p></div>`;
+    }
+
+    // =========================================================================
+    // Modals: Log / Task / TaskDetail / Material / WorkerMat / Site / Person
+    // =========================================================================
+    function renderModal() {
+      const m = runtime.modal;
+      if (!m) return "";
+      const { user, sites, people, checkins } = getScope();
+      if (!user) return "";
+
+      let title = "";
+      let body = "";
+
+      if (m.type === "log") {
+        const editing = m.editId ? state.logs.find((l) => l.id === m.editId) : null;
+        title = editing ? "改日誌" : "每日地盤日誌";
+        const defSiteId = editing?.siteId || m.siteId || sites[0]?.id || "";
+        const defDate = editing?.date || todayISO();
+        const roster = checkins.filter((r) => r.siteId === defSiteId && r.date === defDate);
+        const cat = state.catalog ?? DEFAULT_CATALOG;
+        body = `<div class="space-y-3 text-sm">
+          <label class="block"><span class="font-medium">工地</span><select id="ml-site" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3">${sites.map((s) => `<option value="${s.id}" ${s.id === defSiteId ? "selected" : ""}>${esc(s.district)} · ${esc(s.name)}</option>`).join("")}</select></label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block"><span class="font-medium">日期</span><input id="ml-date" type="date" value="${esc(defDate)}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+            <label class="block"><span class="font-medium">天氣</span><select id="ml-weather" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3">${WEATHERS.map((w) => `<option value="${w}" ${(editing?.weather || "天晴") === w ? "selected" : ""}>${w}</option>`).join("")}</select></label>
+          </div>
+          <label class="block"><span class="font-medium">填寫人</span><input id="ml-author" value="${esc(editing?.authorName || user.name)}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="flex items-center gap-2 font-medium"><input id="ml-nowork" type="checkbox" class="size-5" ${editing?.noWork ? "checked" : ""} /> 今日無施工</label>
+          <div class="space-y-1">
+            <span class="font-medium">當日工作（可揀常用工序再補字）</span>
+            <select id="ml-proc" class="min-h-11 w-full rounded-2xl border border-line px-3"><option value="">＋ 加入常用工序…</option>${cat.processes.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join("")}</select>
+            <textarea id="ml-work" rows="3" placeholder="寫今日做咗咩…" class="w-full rounded-2xl border border-line p-3">${esc(editing?.work || "")}</textarea>
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between"><span class="font-medium">工種人數（例如：水電 2、木器 3）</span><button type="button" id="ml-use-checkin" class="text-xs font-bold text-navy underline">用今日報到人數</button></div>
+            <input id="ml-hc" value="${esc((editing?.headcount || []).map((h) => `${h.trade} ${h.count}`).join("、"))}" placeholder="泥水 2、水電 1" class="min-h-11 w-full rounded-2xl border border-line px-3" />
+          </div>
+          ${roster.length ? `<div class="rounded-2xl bg-paper-2 p-3 text-xs space-y-1">${roster.map((r) => `<p>${r.absent ? "去唔到" : r.leftAt ? "已走" : "在場"} · ${esc(r.memberName)}${r.note ? ` · ${esc(r.note)}` : ""}</p>`).join("")}${roster.some((r) => r.absent || r.note) ? `<button type="button" id="ml-copy-notes" class="mt-1 rounded-full bg-card px-3 py-1 font-bold text-navy border border-line">將去唔到同交帶寫入問題</button>` : ""}</div>` : ""}
+          <label class="block"><span class="font-medium">送貨</span><input id="ml-deliv" value="${esc(editing?.deliveries || "")}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">問題</span><textarea id="ml-issues" rows="2" class="mt-1 w-full rounded-2xl border border-line p-3">${esc(editing?.issues || "")}</textarea></label>
+          <div class="grid grid-cols-2 gap-2 pt-2">
+            <button type="button" id="ml-save-draft" class="min-h-11 rounded-full border border-line bg-card font-bold">儲存草稿</button>
+            <button type="button" id="ml-submit" class="min-h-11 rounded-full bg-navy font-bold text-paper">提交</button>
+          </div>
+        </div>`;
+      } else if (m.type === "task") {
+        title = m.kind === "snag" ? "報問題／執漏" : "開任務";
+        const defSiteId = m.siteId || sites[0]?.id || "";
+        body = `<div class="space-y-3 text-sm">
+          <label class="block"><span class="font-medium">標題</span><input id="mt-title" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">工地</span><select id="mt-site" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3">${sites.map((s) => `<option value="${s.id}" ${s.id === defSiteId ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
+          <label class="block"><span class="font-medium">位置</span><input id="mt-loc" placeholder="例如主人房" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">描述</span><textarea id="mt-desc" rows="2" class="mt-1 w-full rounded-2xl border border-line p-3"></textarea></label>
+          ${user.role !== "subcontractor" ? `<label class="block"><span class="font-medium">負責人</span><select id="mt-assignee" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3"><option value="">未分派</option>${people.map((p) => `<option value="${p.id}">${esc(p.name)} · ${esc(p.title)}</option>`).join("")}</select></label>` : ""}
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block"><span class="font-medium">優先</span><select id="mt-prio" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3">${Object.keys(PRIORITY_LABEL).map((k) => `<option value="${k}" ${k === "normal" ? "selected" : ""}>${PRIORITY_LABEL[k]}</option>`).join("")}</select></label>
+            <label class="block"><span class="font-medium">期限</span><input id="mt-due" type="date" value="${todayISO()}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          </div>
+          <button type="button" id="mt-submit" class="min-h-11 w-full rounded-full bg-gold font-black text-ink">儲存</button>
+        </div>`;
+      } else if (m.type === "taskDetail") {
+        const task = state.tasks.find((t) => t.id === m.taskId);
+        const site = task ? state.sites.find((s) => s.id === task.siteId) : null;
+        if (!task || !site || !canSeeTask(user, task, site)) { runtime.modal = null; return ""; }
+        const canApprove = can(user, "approve_task", site);
+        title = task.kind === "snag" ? "執漏詳情" : "任務詳情";
+        body = `<div class="space-y-3 text-sm">
+          ${task.needsRework ? `<p class="rounded-2xl bg-clay-soft p-3 text-clay font-bold">主管退回。改完再交去驗收，張單先算埋口。</p>` : ""}
+          <div class="flex flex-wrap gap-1.5 text-xs font-bold">
+            <span class="rounded-full bg-navy px-2.5 py-1 text-paper">${STATUS_LABEL[task.status]}</span>
+            ${task.blocked ? `<span class="rounded-full bg-clay-soft px-2.5 py-1 text-clay">受阻：${esc(task.blockReason)}</span>` : ""}
+            <span class="rounded-full bg-gold/30 px-2.5 py-1">${PRIORITY_LABEL[task.priority]}</span>
+          </div>
+          <h3 class="text-xl font-black">${esc(task.title)}</h3>
+          <p class="text-xs text-muted">${esc(site.district)} · ${esc(site.name)}${task.location ? ` · ${esc(task.location)}` : ""} · 期限 ${formatDate(task.due)}</p>
+          <p>${esc(task.description || "未寫描述。")}</p>
+          <p class="text-xs text-muted">負責人：${esc(memberName(state.members, task.assigneeId))}</p>
+          ${(task.photos.length + task.donePhotos.length) > 0 ? `<div class="grid grid-cols-3 gap-2">${[...task.photos, ...task.donePhotos].map((ph) => imgTag(ph.src, ph.caption, "aspect-square w-full rounded-2xl object-cover")).join("")}</div>` : ""}
+          ${canApprove && task.status !== "done" ? `<div class="flex gap-2"><select id="td-assign-sel" class="min-h-11 flex-1 rounded-2xl border border-line px-3"><option value="">揀負責人…</option>${people.map((p) => `<option value="${p.id}" ${p.id === task.assigneeId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select><button type="button" id="td-assign-btn" class="min-h-11 rounded-full bg-paper-2 px-4 font-bold">分派</button></div>` : ""}
+          <div class="grid grid-cols-2 gap-2">
+            ${task.status !== "done" && task.status !== "review" ? `<button type="button" id="td-start" class="min-h-11 rounded-full bg-paper-2 font-bold">開始處理</button>` : ""}
+            ${task.status === "in_progress" || task.status === "pending" ? `<button type="button" id="td-review" class="min-h-11 rounded-full bg-navy font-bold text-paper">交去驗收</button>` : ""}
+            ${canApprove && task.status === "review" ? `<button type="button" id="td-approve" class="min-h-11 rounded-full bg-gold font-black text-ink">驗收完成</button>` : ""}
+          </div>
+          ${task.status === "in_progress" || task.status === "pending" ? `<label class="block text-xs"><span class="font-bold">附上完工相（交去驗收時一併儲存，已選 ${(m.pendingPhotos || []).length} 張）</span><input id="td-photo" type="file" accept="image/*" class="mt-1 block w-full" /></label>` : ""}
+          ${canApprove && task.status === "review" ? `<div class="space-y-1"><textarea id="td-return-note" rows="2" placeholder="寫低邊度未得（退回必填）" class="w-full rounded-2xl border border-line p-2.5"></textarea><button type="button" id="td-return" class="min-h-10 rounded-full border border-clay px-4 text-xs font-bold text-clay">退回修改</button></div>` : ""}
+          ${task.status !== "done" ? (task.blocked ? `<button type="button" id="td-unblock" class="min-h-10 rounded-full bg-paper-2 px-4 text-xs font-bold">解除受阻</button>` : `<div class="flex gap-2"><input id="td-block-reason" placeholder="受阻原因（例如等料）" class="min-h-10 flex-1 rounded-2xl border border-line px-3 text-xs" /><button type="button" id="td-block" class="min-h-10 rounded-full bg-clay px-4 text-xs font-bold text-paper">受阻</button></div>`) : ""}
+          <div class="rounded-2xl bg-paper-2 p-3 space-y-1"><p class="font-bold text-xs">留痕</p>${task.activity.slice().reverse().map((a) => `<p class="text-xs text-muted">${formatWhen(a.at)} · ${esc(a.byName)} · ${esc(a.action)}</p>`).join("")}</div>
+        </div>`;
+      } else if (m.type === "material" || m.type === "workerMat") {
+        const isW = m.type === "workerMat";
+        title = isW ? "工人叫料" : "材料跟進";
+        body = `<div class="space-y-3 text-sm">
+          <label class="block"><span class="font-medium">工地</span><select id="mm-site" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3">${sites.map((s) => `<option value="${s.id}" ${s.id === m.siteId ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
+          <label class="block"><span class="font-medium">材料名</span><input id="mm-name" placeholder="例如防水料" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">數量</span><input id="mm-qty" placeholder="例如兩桶" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          ${!isW ? `<label class="block"><span class="font-medium">供應商</span><input id="mm-sup" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label><label class="block"><span class="font-medium">要用到日子</span><input id="mm-due" type="date" value="${todayISO()}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>` : ""}
+          <label class="block"><span class="font-medium">備註</span><input id="mm-note" placeholder="聽日鋪磚要用" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <button type="button" id="mm-submit" class="min-h-11 w-full rounded-full bg-gold font-black text-ink">${isW ? "交出去叫料" : "儲存"}</button>
+        </div>`;
+      } else if (m.type === "site") {
+        title = "開新工地";
+        const sups = people.filter((p) => p.role !== "subcontractor");
+        body = `<div class="space-y-3 text-sm">
+          <label class="block"><span class="font-medium">工地名</span><input id="ms-name" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">地區</span><input id="ms-dist" placeholder="例如紅磡" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">地址</span><input id="ms-addr" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">客戶</span><input id="ms-client" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">工地主管</span><select id="ms-sup" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3">${sups.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>
+          <label class="block"><span class="font-medium">目標完工</span><input id="ms-date" type="date" value="${isoOffset(30)}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <button type="button" id="ms-submit" class="min-h-11 w-full rounded-full bg-gold font-black text-ink">儲存工地</button>
+        </div>`;
+      } else if (m.type === "person") {
+        title = "加人手";
+        body = `<div class="space-y-3 text-sm">
+          <label class="block"><span class="font-medium">姓名</span><input id="mp-name" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">身份</span><select id="mp-role" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3"><option value="subcontractor">分判／工人</option><option value="site_supervisor">工地主管</option><option value="project_manager">項目經理</option></select></label>
+          <label class="block"><span class="font-medium">工種（分判必填）</span><input id="mp-trade" placeholder="水電、木器、油漆" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <label class="block"><span class="font-medium">電話</span><input id="mp-phone" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3" /></label>
+          <button type="button" id="mp-submit" class="min-h-11 w-full rounded-full bg-gold font-black text-ink">儲存</button>
+        </div>`;
+      }
+
+      return `<div class="fixed inset-0 z-50 flex items-end justify-center md:items-center">
+        <button type="button" id="modal-close-bg" class="absolute inset-0 bg-navy/50" aria-label="關閉"></button>
+        <div class="relative z-10 max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-card p-5 shadow-card md:max-w-lg md:rounded-3xl">
+          <div class="mb-4 flex items-center justify-between"><h2 class="text-xl font-black">${esc(title)}</h2><button type="button" id="modal-close-x" class="rounded-full bg-paper-2 px-3 py-1 text-xs font-bold">關閉</button></div>
+          ${body}
+        </div>
+      </div>`;
+    }
+
+    // =========================================================================
+    // Pages (Marketing, Login, Shell, Overview, Sites, Tasks, Logs, People, Materials, Files, Reports, Billing, Admin, Account)
+    // =========================================================================
+    function renderMarketing() {
+      const user = getUser();
+      const enterHref = user ? (user.role === "platform_admin" ? "#/app/admin" : "#/app") : "#/login";
+      const openTasks = state.tasks.filter((t) => t.status !== "done").length;
+      const submitted = state.logs.filter((l) => l.status === "submitted").length;
+      const crew = state.members.filter((m) => m.companyId).length;
+      return `<div class="min-h-dvh bg-paper pb-10">
+        ${bannerHtml()}
+        <header class="sticky top-0 z-20 border-b border-line bg-card/95 backdrop-blur">
+          <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+            <a href="#/" class="flex items-center gap-2">${brandMark("md")}<span class="text-lg font-black">地盤通</span></a>
+            <a href="#/login" class="inline-flex min-h-11 items-center rounded-full bg-gold px-4 text-sm font-black text-ink">登入示範</a>
+          </div>
+        </header>
+        <main class="mx-auto max-w-5xl space-y-4 px-4 py-4">
+          <div class="grid items-stretch gap-4 lg:grid-cols-2">
+            <section class="overflow-hidden rounded-3xl border border-line bg-card shadow-card">
+              <div class="h-1.5 bg-gold"></div>
+              <div class="p-5">
+                <div class="flex flex-wrap gap-2"><span class="rounded-full bg-navy px-3 py-1 text-xs font-bold text-card">地盤通專屬工地台</span><span class="rounded-full bg-leaf-soft px-3 py-1 text-xs font-bold text-leaf">日誌、執漏、材料同一個位</span></div>
+                <div class="mt-4 flex items-start gap-3">${brandMark("md")}<div><h1 class="text-2xl font-black text-navy">裕安 · 澄木 — 各公司自己一份紀錄</h1><p class="mt-2 text-sm leading-6 text-muted">換公司就隔離。主管睇自己嘅盤，分判只見到獲分派嘅工地。</p></div></div>
+                <div class="mt-5 grid grid-cols-2 gap-2">
+                  <a href="${enterHref}" class="flex min-h-12 items-center justify-center rounded-2xl bg-gold px-3 text-sm font-black text-ink">${user ? "返去今日工作" : "入去試用"}</a>
+                  <button type="button" data-scroll="pricing" class="flex min-h-12 items-center justify-center rounded-2xl border border-line bg-card px-3 text-sm font-black text-ink">睇月費</button>
+                  <a href="#/login" class="flex min-h-12 items-center justify-center rounded-2xl bg-navy px-3 text-sm font-black text-card">登入示範</a>
+                  <button type="button" data-scroll="access" class="flex min-h-12 items-center justify-center rounded-2xl bg-clay px-3 text-sm font-black text-card">邊個睇到咩</button>
                 </div>
               </div>
-              
-            </header>
-            <main class="px-4 pb-28 pt-4 md:px-8 md:pb-12"><div class="space-y-4">
-        <div>
-          <h1 class="text-3xl font-black">客戶公司 · 超級管理員控制台</h1>
-          <p class="text-sm text-muted">管理全站功能開關、跨公司成員、一鍵推送 index.html 到 GitHub 同 Firebase 接駁（仍保持工地日誌隔離）。</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" data-admin-tab="features" class="min-h-11 rounded-full px-4 text-sm font-bold border border-line bg-card">功能開關</button><button type="button" data-admin-tab="members" class="min-h-11 rounded-full px-4 text-sm font-bold border border-line bg-card">全平台成員</button><button type="button" data-admin-tab="deploy" class="min-h-11 rounded-full px-4 text-sm font-bold bg-navy text-paper">一鍵部署 GitHub</button><button type="button" data-admin-tab="firebase" class="min-h-11 rounded-full px-4 text-sm font-bold border border-line bg-card">Firebase 設定</button>
-        </div>
-
-        
-
-        
-
-        
-          <div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3">
-            <h2 class="text-xl font-black">一鍵推送 index.html 到 GitHub</h2>
-            <p class="text-sm text-muted">同你其他 RenoCamp 網站一樣：Token 只存喺你部機瀏覽器，一掣用 GitHub Contents API 直接更新 <code>index.html</code> 上線。</p>
-            <div class="grid gap-2 md:grid-cols-2">
-              <label class="block text-sm"><span class="font-medium">Owner</span><input id="gh-owner" value="lm1668-cpu" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm"></label>
-              <label class="block text-sm"><span class="font-medium">Repo</span><input id="gh-repo" value="dipan-tong" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm"></label>
-              <label class="block text-sm"><span class="font-medium">Branch</span><input id="gh-branch" value="main" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm"></label>
-              <label class="block text-sm"><span class="font-medium">Path</span><input id="gh-path" value="index.html" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm"></label>
-            </div>
-            <label class="block text-sm"><span class="font-medium">GitHub Personal Access Token（需 Contents: Read &amp; Write，只存本機瀏覽器）</span><input id="gh-pat" type="password" value="" placeholder="github_pat_..." class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" data-listener-added_626b9cf1="true"></label>
-            <div class="flex flex-wrap gap-2">
-              <button type="button" id="btn-gh-push" class="min-h-11 rounded-full bg-gold px-5 text-sm font-black text-ink">一鍵部署 index.html 到 GitHub</button>
-              <button type="button" id="btn-gh-save" class="min-h-11 rounded-full bg-paper-2 px-4 text-sm font-bold">儲存本機設定</button>
-            </div>
+            </section>
+            <figure class="relative overflow-hidden rounded-3xl shadow-card lg:min-h-80">
+              ${imgTag("/photos/crew-depart.jpg", "一齊出發去裝修", "h-64 w-full object-cover object-[center_40%] sm:h-80 lg:absolute lg:inset-0 lg:h-full")}
+              <figcaption class="absolute inset-x-3 bottom-3 flex flex-wrap gap-2"><span class="rounded-full bg-gold px-3 py-1.5 text-xs font-black text-ink">一齊出發去裝修</span><span class="rounded-full bg-navy/90 px-3 py-1.5 text-xs font-bold text-card">由站口行去屋苑</span></figcaption>
+            </figure>
           </div>
+          <section class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <article class="rounded-3xl border border-line bg-card p-4 shadow-card"><p class="text-xs font-bold text-muted">示範工地</p><p class="mt-1 text-3xl font-black tabular-nums text-leaf">${state.sites.length}</p></article>
+            <article class="rounded-3xl border border-clay/40 bg-blush p-4"><p class="text-xs font-bold text-muted">未完成任務</p><p class="mt-1 text-3xl font-black tabular-nums text-clay">${openTasks}</p></article>
+            <article class="rounded-3xl border border-leaf/40 bg-leaf-soft p-4"><p class="text-xs font-bold text-muted">已提交日誌</p><p class="mt-1 text-3xl font-black tabular-nums text-leaf">${submitted}</p></article>
+            <article class="rounded-3xl border border-line bg-ice p-4"><p class="text-xs font-bold text-muted">登記人手</p><p class="mt-1 text-3xl font-black tabular-nums text-gold-2">${crew}</p></article>
+          </section>
+          <section id="access" class="rounded-3xl bg-navy p-5 text-card"><h2 class="text-2xl font-black text-gold">邊個睇到咩，分得清。</h2><p class="mt-2 text-sm leading-6 text-card/85">公司管理員睇晒自己公司。項目經理跟進度。工地主管只睇自己負責嘅盤。分判只睇獲分派嘅工作，入唔到成間公司。平台管理員只管客戶同訂閱，唔翻工地日誌。</p></section>
+          <section id="pricing" class="space-y-3">
+            <h2 class="text-2xl font-black">月費，先傾住</h2>
+            <div class="grid gap-3 md:grid-cols-3">${PLAN_ORDER.map((id, i) => `<article class="rounded-3xl border-2 ${i === 1 ? "border-gold" : "border-line"} bg-card p-4 shadow-card"><div class="flex items-end justify-between"><h3 class="text-xl font-black">${PLANS[id].name}</h3><p class="text-3xl font-black tabular-nums text-leaf">HK$${PLANS[id].price}</p></div><p class="mt-2 text-sm">${PLANS[id].blurb}</p><p class="mt-2 text-xs font-bold text-navy">${PLANS[id].sites} 個工地 · ${PLANS[id].seats} 個帳戶 · ${PLANS[id].gb} GB</p></article>`).join("")}</div>
+            <p class="text-sm font-medium text-clay">${esc(PRICE_NOTE)}</p>
+          </section>
+        </main>
+      </div>`;
+    }
 
-        
+    function renderLogin() {
+      const fbCfg = getSavedFbConfig();
+      const groups = [
+        { title: "平台", ids: ["u-ops"] },
+        { title: "裕安室內工程", ids: ["u-y-admin", "u-y-pm", "u-y-sup", "u-y-sup2", "u-y-elec", "u-y-wood"] },
+        { title: "澄木設計工程", ids: ["u-c-admin"] },
+      ];
+      return `<div class="min-h-dvh bg-paper pb-12">
+        ${bannerHtml()}
+        <main class="mx-auto max-w-3xl space-y-5 px-4 py-6">
+          <a href="#/" class="inline-flex items-center gap-2">${brandMark("sm")}<span class="text-lg font-black">地盤通</span></a>
+          <figure class="overflow-hidden rounded-3xl shadow-card">${imgTag("/photos/crew-depart.jpg", "一齊出發去裝修", "h-44 w-full object-cover object-[center_40%]")}<figcaption class="bg-navy px-4 py-2.5 text-sm font-bold text-card">一齊出發去裝修 · 由站口行去屋苑</figcaption></figure>
+          <section class="rounded-3xl border border-line bg-card p-5 shadow-card space-y-3">
+            <h1 class="text-2xl font-black">正式雲端登入（Firebase）</h1>
+            <p class="text-sm text-muted">專案：${esc(fbCfg.projectId)}。${hasFbConfig(fbCfg) ? "已就緒，請輸入電郵密碼登入。" : "未填 apiKey（可先用陳志遠入 Firebase 設定貼入 apiKey）。"}</p>
+            <div id="cloud-login-err" class="hidden rounded-2xl bg-clay-soft px-4 py-3 text-sm text-clay"></div>
+            <input id="cloud-email" type="email" placeholder="電郵（例如 info@pbc.ltd）" class="min-h-11 w-full rounded-2xl border border-line px-3 text-sm" />
+            <input id="cloud-pass" type="password" placeholder="密碼" class="min-h-11 w-full rounded-2xl border border-line px-3 text-sm" />
+            <button type="button" id="cloud-login-btn" class="inline-flex min-h-11 items-center rounded-full bg-gold px-5 text-sm font-black text-ink">用 Firebase 登入</button>
+          </section>
+          <h2 class="text-2xl font-black">示範身份一鍵試用</h2>
+          ${groups.map((g) => `<section class="space-y-2"><h3 class="text-lg font-black">${g.title}</h3><div class="grid gap-2">${g.ids.map((id) => {
+            const m = state.members.find((x) => x.id === id);
+            if (!m) return "";
+            const comp = state.companies.find((c) => c.id === m.companyId);
+            return `<button type="button" data-login="${m.id}" ${m.disabled ? "disabled" : ""} class="flex min-h-16 items-center gap-3 rounded-3xl border border-line bg-card p-4 text-left shadow-card disabled:opacity-50"><span class="grid size-10 shrink-0 place-items-center rounded-full bg-navy text-sm font-black text-card ring-2 ring-gold">${esc(comp?.mark ?? "台")}</span><span><span class="block font-bold">${esc(m.name)}${m.disabled ? "（已停用）" : ""}</span><span class="block text-xs text-muted">${esc(ROLE_LABEL[m.role])} · ${esc(m.blurb)}</span></span></button>`;
+          }).join("")}</div></section>`).join("")}
+        </main>
+      </div>`;
+    }
 
-        <div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3">
-          <h2 class="text-xl font-black">客戶公司訂閱（用量到頂只提醒，唔鎖唔刪）</h2>
-          <div class="rounded-2xl bg-paper-2 p-3 space-y-2">
-              <div class="flex justify-between"><p class="font-bold">裕安室內工程有限公司</p><span class="rounded-full bg-navy px-2.5 py-0.5 text-xs font-bold text-paper">團隊</span></div>
-              <p class="text-xs text-muted">工地 4/10 · 帳戶 6/20 · 儲存 86/100 GB</p>
-              
-            </div><div class="rounded-2xl bg-paper-2 p-3 space-y-2">
-              <div class="flex justify-between"><p class="font-bold">澄木設計工程</p><span class="rounded-full bg-navy px-2.5 py-0.5 text-xs font-bold text-paper">入門</span></div>
-              <p class="text-xs text-muted">工地 3/3 · 帳戶 1/5 · 儲存 18/20 GB</p>
-              <button type="button" data-extend-trial="co-ching" class="min-h-10 rounded-full bg-gold px-3 text-xs font-bold text-ink">試用加七日</button>
+    function renderAppShell(path, contentHtml) {
+      const { user, company, tasks } = getScope();
+      if (!user) { go("/login"); return ""; }
+      const flags = state.featureFlags ?? DEFAULT_FEATURE_FLAGS;
+      const isPlatform = user.role === "platform_admin";
+      const mainNav = isPlatform ? [] : [{ to: "/app", label: "總覽" }, { to: "/app/sites", label: "工地" }, ...(flags.tasks ? [{ to: "/app/tasks", label: "任務" }] : []), ...(flags.logs ? [{ to: "/app/logs", label: "紀錄" }] : [])];
+      const moreNav = isPlatform
+        ? [{ to: "/app/admin", label: "客戶公司" }, { to: "/app/billing", label: "套餐說明" }, { to: "/app/account", label: "帳戶" }]
+        : [...(user.role !== "subcontractor" ? [{ to: "/app/people", label: "人手／分判" }] : []), ...(flags.materials ? [{ to: "/app/materials", label: "材料" }] : []), ...(flags.files ? [{ to: "/app/files", label: "文件／相片" }] : []), ...(user.role !== "subcontractor" && flags.reports ? [{ to: "/app/reports", label: "報表" }] : []), ...(flags.billing && user.role !== "subcontractor" ? [{ to: "/app/billing", label: "套餐" }] : []), { to: "/app/account", label: "帳戶" }];
+      const today = todayISO();
+      const open = tasks.filter((t) => t.status !== "done" && (t.due <= today || isOverdue(t, today))).length;
+      const isAct = (to) => (to === "/app" ? path === "/app" || path === "/app/" : path === to || path.startsWith(to + "/"));
+
+      return `<div class="min-h-dvh bg-paper">
+        <aside class="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-navy md:flex">
+          <a href="#${isPlatform ? "/app/admin" : "/app"}" class="flex items-center gap-3 px-4 py-5">${brandMark("md")}<span><span class="block text-lg font-black leading-none text-card">地盤通</span><span class="text-xs text-card/70">工地管理</span></span></a>
+          <nav class="flex flex-1 flex-col gap-1 px-3">${[...mainNav, ...moreNav].map((i) => `<a href="#${i.to}" class="flex min-h-11 items-center rounded-2xl px-3 text-sm font-bold ${isAct(i.to) ? "bg-gold text-ink" : "text-card/80"}">${i.label}</a>`).join("")}</nav>
+        </aside>
+        <div class="md:pl-60">
+          <header class="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
+            ${bannerHtml()}
+            <div class="flex items-center gap-3 px-4 py-3">
+              <span class="grid size-11 shrink-0 place-items-center rounded-full bg-navy text-sm font-black text-card ring-2 ring-gold">${esc(company?.mark ?? "地")}</span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-bold">${esc(company?.shortName ?? "地盤通平台")}</p><p class="truncate text-xs text-muted">${esc(ROLE_LABEL[user.role])} · ${esc(user.name)}</p></div>
             </div>
+            ${!isPlatform ? `<div class="px-4 pb-3"><figure class="overflow-hidden rounded-3xl shadow-card">${imgTag("/photos/crew-depart.jpg", "一齊出發去裝修", "h-28 w-full object-cover object-[center_40%]")}<figcaption class="bg-navy px-4 py-2.5 text-sm font-bold text-card">一齊出發 · 今日仲有 <span class="tabular-nums text-gold">${open}</span> 樣未搞掂</figcaption></figure></div>` : ""}
+          </header>
+          <main class="px-4 pb-28 pt-4 md:px-8 md:pb-12">${contentHtml}</main>
         </div>
-      </div></main>
+        <nav class="fixed inset-x-0 bottom-0 z-40 bg-navy md:hidden">
+          <div class="grid ${isPlatform ? "grid-cols-3" : "grid-cols-5"} gap-1 px-1 py-2">
+            ${isPlatform ? moreNav.map((i) => `<a href="#${i.to}" class="flex min-h-12 items-center justify-center rounded-2xl text-xs font-bold ${isAct(i.to) ? "bg-gold text-ink" : "text-card"}">${i.label}</a>`).join("") : `${mainNav.map((i) => `<a href="#${i.to}" class="flex min-h-12 items-center justify-center rounded-2xl text-xs font-bold ${isAct(i.to) ? "bg-gold text-ink" : "text-card"}">${i.label}</a>`).join("")}<button type="button" id="nav-more-btn" class="flex min-h-12 items-center justify-center rounded-2xl text-xs font-bold ${runtime.moreOpen ? "bg-gold text-ink" : "text-card"}">更多</button>`}
           </div>
-          <nav class="fixed inset-x-0 bottom-0 z-40 bg-navy md:hidden">
-            <div class="grid grid-cols-3 gap-1 px-1 py-2">
-              <a href="#/app/admin" class="flex min-h-12 items-center justify-center rounded-2xl text-xs font-bold bg-gold text-ink">客戶公司</a><a href="#/app/billing" class="flex min-h-12 items-center justify-center rounded-2xl text-xs font-bold text-card">套餐說明</a><a href="#/app/account" class="flex min-h-12 items-center justify-center rounded-2xl text-xs font-bold text-card">帳戶</a>
-            </div>
-          </nav>
-          
-        </div></div>
+        </nav>
+        ${runtime.moreOpen ? `<div class="fixed inset-0 z-50 md:hidden"><button type="button" id="close-more-bg" class="absolute inset-0 bg-navy/50"></button><div class="absolute inset-x-0 bottom-0 rounded-t-3xl bg-card p-4 pb-8"><div class="mb-3 flex items-center justify-between"><h2 class="text-xl font-black">更多</h2><button type="button" id="close-more-x" class="rounded-full bg-paper-2 px-3 py-1.5 text-sm font-bold">關閉</button></div><div class="grid grid-cols-2 gap-2">${moreNav.map((i) => `<a href="#${i.to}" class="flex min-h-12 items-center justify-center rounded-2xl border border-line px-3 text-sm font-bold">${i.label}</a>`).join("")}</div></div></div>` : ""}
+        ${renderModal()}
+      </div>`;
+    }
 
+    function renderOverview() {
+      const { user, sites, tasks, logs, materials, checkins, nudges, dayCloses, instructions } = getScope();
+      if (user.role === "platform_admin") { go("/app/admin"); return ""; }
+      const today = todayISO(), soon2 = isoOffset(2);
+      const dueSoon = tasks.filter((t) => t.status !== "done" && t.due > today && t.due <= soon2);
+      const matSoon = materials.filter((m) => m.status !== "delivered" && m.neededBy > today && m.neededBy <= soon2);
+      const canLog = sites.some((s) => can(user, "create_log", s));
+      const canMat = sites.some((s) => can(user, "create_material", s));
 
-<div id="monica-content-root" class="monica-widget" style="pointer-events: auto;"></div></body></html>
+      let loopSection = "";
+      if (user.role === "subcontractor") {
+        const mineToday = checkins.filter((r) => r.memberId === user.id && r.date === today);
+        const rep = (sid) => mineToday.find((r) => r.siteId === sid);
+        const allRep = sites.length === 0 || sites.every((s) => rep(s.id));
+        const allFin = sites.length > 0 && sites.every((s) => { const r = rep(s.id); return r && (r.absent || r.leftAt); });
+        const fresh = tasks.filter((t) => t.status === "pending" || t.status === "unassigned");
+        const doing = tasks.filter((t) => t.status === "in_progress");
+        const waiting = tasks.filter((t) => t.status === "review");
+        const myCalls = materials.filter((m) => m.note.startsWith(`工人叫料：${user.name}`) && m.status !== "delivered");
+        loopSection = `
+          ${loopRailHtml("工人一日", [
+            { label: "到場", hint: allRep ? "每個盤都報過到或話咗去唔到" : "仲有盤未報到", pass: allRep },
+            { label: "開工", hint: fresh.length ? `仲有 ${fresh.length} 張未開始` : "未開始嘅單已清空", pass: fresh.length === 0 },
+            { label: "做完交相", hint: doing.length ? `${doing.length} 張做緊／要改` : "冇單留喺你手", pass: doing.length === 0 },
+            { label: "等主管收", hint: waiting.length ? `${waiting.length} 張等驗收` : "冇單卡喺驗收", pass: waiting.length === 0 },
+            { label: "收工", hint: allFin ? "每個盤都收工或去唔到" : "做完記得撳收工", pass: sites.length === 0 || allFin },
+          ])}
+          ${sites.map((s) => {
+            const mine = rep(s.id);
+            const st = mine?.absent ? "今日去唔到" : mine && !mine.leftAt ? "已到場" : mine ? "今日已收工" : "未報到";
+            return `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2"><p class="font-bold">${esc(s.name)}</p><p class="text-xs text-muted">${st}${mine?.note ? ` · ${esc(mine.note)}` : ""}</p><div class="grid grid-cols-3 gap-2"><button type="button" data-arrive="${s.id}" class="min-h-11 rounded-full bg-navy px-3 text-xs font-bold text-paper">我到場</button><button type="button" data-leave="${s.id}" class="min-h-11 rounded-full bg-paper-2 px-3 text-xs font-bold">我收工</button><button type="button" data-absent="${s.id}" class="min-h-11 rounded-full border border-line px-3 text-xs font-bold">今日去唔到</button></div></div>`;
+          }).join("")}
+          ${myCalls.length ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2"><h3 class="font-bold">你叫過嘅料</h3>${myCalls.map((m) => `<div class="flex items-center justify-between text-sm"><span>${esc(m.name)} · ${esc(m.qty)} · ${MATERIAL_LABEL[m.status]}</span>${m.status === "ordered" ? `<button type="button" data-confirm-mat="${m.id}" class="rounded-full bg-gold px-3 py-1 text-xs font-bold text-ink">我收到</button>` : ""}</div>`).join("")}</div>` : ""}
+          <button type="button" data-open-modal="workerMat" class="min-h-11 rounded-full bg-gold px-5 text-sm font-black text-ink">叫料</button>`;
+      } else {
+        const selfRun = user.role === "company_admin" && sites.length > 0 && sites.every((s) => s.supervisorId === user.id);
+        const missing = sites.filter((s) => logState(logs, s.id, today) !== "submitted");
+        const reviews = tasks.filter((t) => t.status === "review");
+        const pendingNotes = instructions.filter((r) => !r.ackAt);
+        const closedCount = sites.filter((s) => dayCloses.some((r) => r.siteId === s.id && r.date === today)).length;
+        const loose = tasks.filter((t) => t.status === "unassigned");
+        const steps = selfRun
+          ? [{ label: "自己交日誌", hint: missing.length ? `${missing.length} 個盤未交` : "你管嘅盤都交咗", pass: missing.length === 0 }, { label: "驗收", hint: reviews.length ? `${reviews.length} 張等你收` : "冇單等驗收", pass: reviews.length === 0 }, { label: "等自己回指示", hint: pendingNotes.length ? `${pendingNotes.length} 句未回` : "冇指示吊住", pass: pendingNotes.length === 0 }, { label: "收工", hint: `收咗 ${closedCount}/${sites.length} 個盤`, pass: sites.length > 0 && closedCount === sites.length }]
+          : user.role === "site_supervisor"
+          ? [{ label: "點人", hint: checkins.some((r) => r.date === today) || logs.some((r) => r.date === today) ? "今日有人報到或已開日誌" : "未有人報到", pass: checkins.some((r) => r.date === today) || logs.some((r) => r.date === today) }, { label: "交日誌", hint: missing.length ? `${missing.length} 個盤未交` : "你管嘅盤都交咗", pass: missing.length === 0 }, { label: "分派", hint: loose.length ? `${loose.length} 張未分派` : "張張有人跟", pass: loose.length === 0 }, { label: "驗收", hint: reviews.length ? `${reviews.length} 張等你收` : "冇單等驗收", pass: reviews.length === 0 }, { label: "回指示", hint: pendingNotes.length ? `${pendingNotes.length} 句未回` : "指示都回過", pass: pendingNotes.length === 0 }, { label: "收工", hint: `收咗 ${closedCount}/${sites.length} 個盤`, pass: sites.length > 0 && closedCount === sites.length }]
+          : [{ label: user.role === "project_manager" ? "睇邊個拖" : "數未交日誌", hint: missing.length ? `${missing.length} 個盤未交` : "日誌齊", pass: missing.length === 0 }, { label: "催主管", hint: missing.length ? "未交嘅盤可催主管" : "唔使催", pass: missing.length === 0 || missing.every((s) => nudges.some((n) => n.siteId === s.id && n.date === today && !n.resolvedAt)) }, { label: "等現場回指示", hint: pendingNotes.length ? `${pendingNotes.length} 句未回` : "指示都有人回", pass: pendingNotes.length === 0 }, { label: "等各盤收工", hint: `${closedCount}/${sites.length} 個盤收咗工`, pass: sites.length > 0 && closedCount === sites.length }];
+        loopSection = `
+          ${loopRailHtml(selfRun ? "老闆兼主管" : user.role === "company_admin" ? "老闆一日" : user.role === "project_manager" ? "經理一日" : "主管一日", steps)}
+          <div class="space-y-3">${sites.map((s) => {
+            const lg = logState(logs, s.id, today);
+            const cl = dayCloses.find((r) => r.siteId === s.id && r.date === today);
+            const pIns = instructions.filter((r) => r.siteId === s.id && !r.ackAt);
+            const rev = tasks.find((t) => t.siteId === s.id && t.status === "review");
+            return `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2">
+              <div class="flex justify-between"><div><p class="font-bold">${esc(s.name)}</p><p class="text-xs text-muted">${esc(s.district)} · 進度 ${siteProgress(s)}%</p></div><span class="rounded-full px-2.5 py-1 text-xs font-bold h-fit ${lg === "submitted" ? "bg-navy text-paper" : "bg-gold/30 text-ink"}">${LOG_STATE_LABEL[lg]}</span></div>
+              ${pIns.map((ins) => `<div class="rounded-2xl bg-paper-2 p-2.5 text-xs flex items-center justify-between gap-2"><span>${esc(ins.byName)}：${esc(ins.text)}</span><button type="button" data-ack-ins="${ins.id}" class="rounded-full bg-card px-2.5 py-1 font-bold border border-line">收到</button></div>`).join("")}
+              ${cl ? `<p class="text-xs text-leaf font-bold">已收工 · ${esc(cl.byName)}：${esc(cl.note)}</p>` : ""}
+              <div class="flex flex-wrap gap-2">
+                ${lg !== "submitted" ? `<button type="button" data-open-log="${s.id}" class="min-h-10 rounded-full bg-navy px-3 text-xs font-bold text-paper">寫今日日誌</button>` : ""}
+                ${rev ? `<button type="button" data-open-task="${rev.id}" class="min-h-10 rounded-full bg-gold px-3 text-xs font-black text-ink">去驗收</button>` : ""}
+                ${can(user, "nudge_log", s) && lg !== "submitted" ? `<button type="button" data-nudge="${s.id}" class="min-h-10 rounded-full border border-line px-3 text-xs font-bold">催交</button>` : ""}
+                ${can(user, "instruct", s) ? `<button type="button" data-instruct="${s.id}" class="min-h-10 rounded-full bg-paper-2 px-3 text-xs font-bold">落指示</button>` : ""}
+                ${can(user, "close_day", s) ? `<button type="button" data-close-day="${s.id}" class="min-h-10 rounded-full bg-paper-2 px-3 text-xs font-bold">${cl ? "改收工交帶" : "今日收工"}</button>` : ""}
+              </div>
+            </div>`;
+          }).join("")}</div>`;
+      }
+
+      return `<div class="space-y-4">
+        <div><p class="text-sm font-bold text-muted">${formatDate(today)} 星期${weekday(today)}</p><h1 class="text-3xl font-black">${esc(user.name)}，今日有咩要跟？</h1></div>
+        ${loopSection}
+        <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+          ${canLog ? `<button type="button" data-open-modal="log" class="min-h-11 rounded-full bg-navy px-3 text-sm font-bold text-paper">寫每日紀錄</button>` : ""}
+          <button type="button" data-open-modal="task" class="min-h-11 rounded-full bg-gold px-3 text-sm font-black text-ink">開任務</button>
+          <button type="button" data-open-modal="snag" class="min-h-11 rounded-full border border-line bg-card px-3 text-sm font-bold">報問題</button>
+          ${canMat ? `<button type="button" data-open-modal="material" class="min-h-11 rounded-full bg-paper-2 px-3 text-sm font-bold">材料跟進</button>` : ""}
+        </div>
+        ${dueSoon.length + matSoon.length > 0 ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-1"><h3 class="font-bold">兩日內要跟</h3>${dueSoon.map((t) => `<p class="text-sm">${esc(t.title)} · ${t.due.slice(5)}</p>`).join("")}${matSoon.map((m) => `<p class="text-sm text-muted">料 · ${esc(m.name)} · ${m.neededBy.slice(5)}</p>`).join("")}</div>` : ""}
+        <section class="space-y-3"><h2 class="text-2xl font-black">各工地進度</h2><div class="grid gap-3 md:grid-cols-2">${sites.map((s) => `<a href="#/app/sites/${s.id}" class="overflow-hidden rounded-3xl border border-line bg-card shadow-card block">${imgTag(s.cover, s.name, "h-32 w-full object-cover")}<div class="p-4 space-y-1"><p class="text-xs text-muted">${esc(s.district)} · ${esc(s.stage)}</p><p class="font-bold">${esc(s.name)}</p><div class="flex items-center gap-3"><div class="h-2 flex-1 overflow-hidden rounded-full bg-paper-2"><div class="h-full bg-navy" style="width:${siteProgress(s)}%"></div></div><span class="text-sm tabular-nums">${siteProgress(s)}%</span></div></div></a>`).join("")}</div></section>
+      </div>`;
+    }
+
+    function renderSites() {
+      const { user, sites } = getScope();
+      if (!user || user.role === "platform_admin") return deniedHtml();
+      return `<div class="space-y-4">
+        <div class="flex items-end justify-between"><h1 class="text-3xl font-black">工地</h1>${can(user, "create_site") ? `<button type="button" data-open-modal="site" class="min-h-11 rounded-full bg-navy px-4 text-sm font-bold text-paper">開工地</button>` : ""}</div>
+        <div class="grid gap-3 md:grid-cols-2">${sites.map((s) => `<a href="#/app/sites/${s.id}" class="overflow-hidden rounded-3xl border border-line bg-card shadow-card block">${imgTag(s.cover, s.name, "h-40 w-full object-cover")}<div class="p-4 space-y-1"><p class="text-xs text-muted">${esc(s.district)} · ${esc(s.stage)}</p><p class="font-bold">${esc(s.name)}</p><p class="text-sm text-muted">${esc(s.client)} · 目標 ${formatDate(s.targetDate)}</p></div></a>`).join("")}</div>
+      </div>`;
+    }
+
+    function renderSiteDetail(siteId) {
+      const { user, logs, tasks, materials, files, people } = getScope();
+      if (!user || user.role === "platform_admin") return deniedHtml();
+      const site = state.sites.find((s) => s.id === siteId);
+      if (!site || !canSeeSite(user, site)) return deniedHtml();
+      const siteLogs = logs.filter((l) => l.siteId === site.id), siteTasks = tasks.filter((t) => t.siteId === site.id), siteMats = materials.filter((m) => m.siteId === site.id), siteFiles = files.filter((f) => f.siteId === site.id);
+      const tab = runtime.siteTab, editable = can(user, "edit_site", site), subs = people.filter((p) => p.role === "subcontractor");
+      return `<div class="space-y-4">
+        ${imgTag(site.cover, site.name, "h-44 w-full rounded-3xl object-cover")}
+        <div><p class="text-sm text-muted">${esc(site.district)} · ${esc(site.stage)}</p><h1 class="text-3xl font-black">${esc(site.name)}</h1></div>
+        <div class="flex gap-2 overflow-x-auto">${[["overview", "概覽"], ["progress", "進度"], ["logs", "紀錄"], ["resources", "資源"], ["files", "文件"]].map(([id, lb]) => `<button type="button" data-site-tab="${id}" class="min-h-11 shrink-0 rounded-full px-4 text-sm font-bold ${tab === id ? "bg-navy text-paper" : "border border-line bg-card"}">${lb}</button>`).join("")}</div>
+        ${tab === "overview" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card grid gap-2 text-sm md:grid-cols-2"><div><span class="text-muted">地址：</span>${esc(site.address)}</div><div><span class="text-muted">客戶：</span>${esc(site.client)}</div><div><span class="text-muted">工地主管：</span>${esc(memberName(state.members, site.supervisorId))}</div><div><span class="text-muted">目標完工：</span>${formatDate(site.targetDate)}</div></div>` : ""}
+        ${tab === "progress" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3">${site.trades.map((t, idx) => `<div><div class="flex justify-between text-sm"><span>${esc(t.name)}</span><span class="tabular-nums">${t.progress}%</span></div><div class="mt-1 h-2 overflow-hidden rounded-full bg-paper-2"><div class="h-full bg-navy" style="width:${t.progress}%"></div></div>${editable ? `<input type="range" min="0" max="100" value="${t.progress}" data-trade-site="${site.id}" data-trade-idx="${idx}" class="mt-1 w-full" />` : ""}</div>`).join("")}</div>` : ""}
+        ${tab === "logs" ? (user.role === "subcontractor"
+          ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card"><p class="font-bold">今日${LOG_STATE_LABEL[logState(siteLogs, site.id, todayISO())]}</p><p class="mt-1 text-sm text-muted">正式日誌由主管寫。你只睇到今日開唔開工，睇唔到日誌內文。</p></div>`
+          : `<div class="space-y-3">${can(user, "create_log", site) ? `<button type="button" data-open-log="${site.id}" class="min-h-11 rounded-full bg-navy px-4 text-sm font-bold text-paper">寫今日紀錄</button>` : ""}${siteLogs.map((l) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card"><div class="flex justify-between"><p class="font-bold">${formatDate(l.date)} · ${esc(l.weather)}</p><span class="text-xs font-bold">${l.status === "draft" ? "草稿" : "已提交"}</span></div><p class="mt-1 text-sm">${l.noWork ? "今日無施工" : esc(l.work)}</p><p class="mt-1 text-xs text-muted">填寫人 ${esc(l.authorName)}</p></div>`).join("") || `<p class="text-sm text-muted">未有日誌。</p>`}</div>`) : ""}
+        ${tab === "resources" ? `<div class="space-y-3">
+          ${can(user, "assign_sub", site) ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2"><h2 class="font-bold">分判派場</h2>${subs.map((p) => { const on = site.assignedSubIds.includes(p.id); return `<div class="flex items-center justify-between text-sm"><span>${esc(p.name)} · ${esc(p.trade || "")}</span><button type="button" data-toggle-sub-site="${site.id}" data-toggle-sub-id="${p.id}" class="min-h-9 rounded-full px-3 text-xs font-bold ${on ? "bg-paper-2" : "border border-line"}">${on ? "已派" : "派入場"}</button></div>`; }).join("")}</div>` : ""}
+          <div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2"><div class="flex justify-between items-center"><h2 class="font-bold">任務（${siteTasks.length}）</h2><button type="button" data-open-site-task="${site.id}" class="text-xs font-bold text-navy underline">＋ 開任務</button></div>${siteTasks.map((t) => `<button type="button" data-open-task="${t.id}" class="flex w-full justify-between rounded-2xl border border-line px-3 py-2 text-left text-sm"><span>${esc(t.title)}</span><span class="text-xs font-bold">${STATUS_LABEL[t.status]}</span></button>`).join("") || `<p class="text-sm text-muted">未有任務。</p>`}</div>
+          <div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-1"><h2 class="font-bold">材料（${siteMats.length}）</h2>${siteMats.map((m) => `<p class="text-sm">${esc(m.name)} · ${esc(m.qty)} · ${MATERIAL_LABEL[m.status]}</p>`).join("") || `<p class="text-sm text-muted">未有材料。</p>`}</div>
+        </div>` : ""}
+        ${tab === "files" ? `<div class="grid gap-3 sm:grid-cols-2">${siteFiles.map((f) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card">${f.src ? imgTag(f.src, f.name, "mb-2 h-32 w-full rounded-2xl object-cover") : ""}<p class="font-bold">${esc(f.name)}</p><p class="text-xs text-muted">${esc(f.note)}</p></div>`).join("") || `<p class="text-sm text-muted">未有檔案。</p>`}</div>` : ""}
+      </div>`;
+    }
+
+    function renderTasks() {
+      const { user, tasks, sites } = getScope();
+      if (!user || user.role === "platform_admin") return deniedHtml();
+      const filters = ["全部", "今日", "逾期", "要改", "待驗收", "受阻", "執漏"], today = todayISO();
+      const rows = tasks.filter((t) => {
+        if (runtime.taskFilter === "今日") return t.due === today && t.status !== "done";
+        if (runtime.taskFilter === "逾期") return isOverdue(t, today);
+        if (runtime.taskFilter === "要改") return Boolean(t.needsRework) && t.status !== "done";
+        if (runtime.taskFilter === "待驗收") return t.status === "review";
+        if (runtime.taskFilter === "受阻") return t.blocked;
+        if (runtime.taskFilter === "執漏") return t.kind === "snag";
+        return true;
+      });
+      return `<div class="space-y-4">
+        <div class="flex items-end justify-between gap-2"><h1 class="text-3xl font-black">任務／執漏</h1><div class="flex gap-2"><button type="button" data-open-modal="snag" class="min-h-11 rounded-full border border-line bg-card px-4 text-sm font-bold">執漏</button><button type="button" data-open-modal="task" class="min-h-11 rounded-full bg-navy px-4 text-sm font-bold text-paper">開任務</button></div></div>
+        <div class="flex gap-2 overflow-x-auto">${filters.map((f) => `<button type="button" data-task-filter="${f}" class="min-h-11 shrink-0 rounded-full px-4 text-sm font-bold ${runtime.taskFilter === f ? "bg-navy text-paper" : "border border-line bg-card"}">${f}</button>`).join("")}</div>
+        <div class="space-y-2">${rows.map((t) => `<button type="button" data-open-task="${t.id}" class="w-full rounded-3xl border border-line bg-card p-4 text-left shadow-card">
+          <div class="flex flex-wrap gap-1.5 text-xs font-bold"><span class="rounded-full bg-paper-2 px-2.5 py-1">${STATUS_LABEL[t.status]}</span>${t.blocked ? `<span class="rounded-full bg-clay-soft px-2.5 py-1 text-clay">受阻</span>` : ""}${t.needsRework ? `<span class="rounded-full bg-clay-soft px-2.5 py-1 text-clay">要改</span>` : ""}</div>
+          <p class="mt-2 font-bold">${esc(t.title)}</p>
+          <p class="text-xs text-muted">${esc(sites.find((s) => s.id === t.siteId)?.name ?? "")} · ${PRIORITY_LABEL[t.priority]} · ${formatDate(t.due)}</p>
+        </button>`).join("") || `<p class="text-sm text-muted">呢個篩選下面暫時冇單。</p>`}</div>
+      </div>`;
+    }
+
+    function renderLogs() {
+      const { user, logs, sites } = getScope();
+      if (!user || user.role === "platform_admin") return deniedHtml();
+      const today = todayISO();
+      if (user.role === "subcontractor") {
+        return `<div class="space-y-4"><h1 class="text-3xl font-black">每日紀錄</h1><p class="text-sm text-muted">正式日誌由主管寫。你只睇到今日開唔開工，睇唔到成份紀錄。</p>${sites.map((s) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card"><p class="font-bold">${esc(s.name)}</p><p class="text-sm text-muted">今日${LOG_STATE_LABEL[logState(logs, s.id, today)]}</p></div>`).join("")}</div>`;
+      }
+      return `<div class="space-y-4">
+        <div class="flex items-end justify-between"><h1 class="text-3xl font-black">每日紀錄</h1><button type="button" data-open-modal="log" class="min-h-11 rounded-full bg-navy px-4 text-sm font-bold text-paper">寫紀錄</button></div>
+        ${logs.map((l) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-1">
+          <div class="flex justify-between"><p class="text-xs text-muted">${esc(sites.find((x) => x.id === l.siteId)?.name ?? "")}</p><span class="rounded-full px-2.5 py-0.5 text-xs font-bold ${l.status === "draft" ? "bg-gold/30" : "bg-navy text-paper"}">${l.status === "draft" ? "草稿" : "已提交"}</span></div>
+          <p class="font-bold">${formatDate(l.date)} 星期${weekday(l.date)} · ${esc(l.weather)}</p>
+          <p class="text-sm">${l.noWork ? "今日無施工。" : esc(l.work)}</p>
+          ${l.deliveries ? `<p class="text-xs text-muted">送貨：${esc(l.deliveries)}</p>` : ""}
+          ${l.issues ? `<p class="text-xs text-clay">問題：${esc(l.issues)}</p>` : ""}
+          ${l.headcount?.length ? `<p class="text-xs text-muted">人數：${l.headcount.map((h) => `${esc(h.trade)} ${h.count}`).join("、")}</p>` : ""}
+          <p class="text-xs text-muted">填寫人 ${esc(l.authorName)}</p>
+          ${(l.revisions || []).map((r) => `<p class="text-xs text-muted">${formatWhen(r.at)} · ${esc(r.byName)} · ${esc(r.note)}</p>`).join("")}
+          <button type="button" data-edit-log="${l.id}" class="mt-2 min-h-9 rounded-full border border-line px-3 text-xs font-bold">修改</button>
+        </div>`).join("")}
+      </div>`;
+    }
+
+    function renderPeople() {
+      const { user, people, sites } = getScope();
+      if (!user || !can(user, "view_people")) return deniedHtml();
+      return `<div class="space-y-4">
+        <div class="flex items-end justify-between"><h1 class="text-3xl font-black">人手／分判</h1>${can(user, "manage_people") ? `<button type="button" data-open-modal="person" class="min-h-11 rounded-full bg-navy px-4 text-sm font-bold text-paper">加人手</button>` : ""}</div>
+        ${people.map((p) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card flex justify-between"><div><p class="font-bold">${esc(p.name)}</p><p class="text-xs text-muted">${ROLE_LABEL[p.role]} · ${esc(p.phone)}</p></div><span class="rounded-full bg-paper-2 px-3 py-1 text-xs font-bold h-fit">${sites.filter((s) => s.supervisorId === p.id || s.assignedSubIds.includes(p.id) || s.managerId === p.id).length} 個盤</span></div>`).join("")}
+      </div>`;
+    }
+
+    function renderMaterials() {
+      const { user, materials, sites } = getScope();
+      if (!user || user.role === "platform_admin") return deniedHtml();
+      const canEdit = sites.some((s) => can(user, "edit_material", s));
+      return `<div class="space-y-4">
+        <div class="flex items-end justify-between"><h1 class="text-3xl font-black">材料</h1>${canEdit ? `<button type="button" data-open-modal="material" class="min-h-11 rounded-full bg-navy px-4 text-sm font-bold text-paper">加跟進</button>` : `<button type="button" data-open-modal="workerMat" class="min-h-11 rounded-full bg-gold px-4 text-sm font-black text-ink">叫料</button>`}</div>
+        ${materials.map((m) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2">
+          <div class="flex justify-between"><div><p class="font-bold">${esc(m.name)}</p><p class="text-xs text-muted">${esc(sites.find((s) => s.id === m.siteId)?.name ?? "")} · ${esc(m.qty)} · 要喺 ${formatDate(m.neededBy)}</p>${m.note ? `<p class="mt-1 text-sm">${esc(m.note)}</p>` : ""}</div><span class="rounded-full bg-paper-2 px-2.5 py-1 text-xs font-bold h-fit">${MATERIAL_LABEL[m.status]}</span></div>
+          ${canEdit ? `<select data-mat-status="${m.id}" class="min-h-10 w-full rounded-2xl border border-line px-3 text-sm">${Object.keys(MATERIAL_LABEL).map((k) => `<option value="${k}" ${m.status === k ? "selected" : ""}>${MATERIAL_LABEL[k]}</option>`).join("")}</select>` : m.note.startsWith(`工人叫料：${user.name}`) && m.status === "ordered" ? `<button type="button" data-confirm-mat="${m.id}" class="min-h-10 rounded-full bg-gold px-4 text-xs font-black text-ink">我收到</button>` : ""}
+        </div>`).join("")}
+      </div>`;
+    }
+
+    function renderFiles() {
+      const { user, files, sites } = getScope();
+      if (!user || user.role === "platform_admin") return deniedHtml();
+      return `<div class="space-y-4"><h1 class="text-3xl font-black">文件／相片</h1><div class="grid gap-3 sm:grid-cols-2">${files.map((f) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card">${f.src ? imgTag(f.src, f.name, "mb-2 h-36 w-full rounded-2xl object-cover") : ""}<p class="font-bold">${esc(f.name)}</p><p class="text-xs text-muted">${esc(sites.find((s) => s.id === f.siteId)?.name ?? "")}</p></div>`).join("")}</div></div>`;
+    }
+
+    function renderReports() {
+      const { user, sites, tasks, logs, checkins } = getScope();
+      if (!user || !can(user, "view_reports")) return deniedHtml();
+      const today = todayISO(), missing = sites.filter((s) => logState(logs, s.id, today) !== "submitted"), waiting = tasks.filter((t) => t.status === "review"), loose = tasks.filter((t) => t.status === "unassigned"), away = checkins.filter((r) => r.date === today && r.absent);
+      return `<div class="space-y-4"><h1 class="text-3xl font-black">報表</h1><div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-1"><h2 class="text-xl font-black">今日未埋口</h2><p class="text-sm">未交日誌 ${missing.length} 個盤${missing.length ? `：${missing.map((s) => esc(s.name)).join("、")}` : ""}</p><p class="text-sm">等驗收 ${waiting.length} 張 · 未分派 ${loose.length} 張</p><p class="text-sm">${away.length ? `今日去唔到：${away.map((r) => esc(r.memberName)).join("、")}` : "今日未有人話去唔到。"}</p></div></div>`;
+    }
+
+    function renderBilling() {
+      const { user, company } = getScope();
+      if (!user || !can(user, "view_billing")) return deniedHtml();
+      return `<div class="space-y-4"><h1 class="text-3xl font-black">套餐</h1><p class="text-sm text-muted">${esc(PRICE_NOTE)}</p>${company ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card"><p class="text-xs text-gold-2">而家用緊</p><h2 class="text-2xl font-black">${PLANS[company.plan].name}</h2><p class="text-xs text-muted mt-1">付款狀態、套餐同用量只可以由後端更新。呢頁改唔到數。</p></div>` : ""}<div class="grid gap-3 md:grid-cols-3">${PLAN_ORDER.map((id) => `<div class="rounded-3xl border border-line bg-card p-4 shadow-card"><h3 class="text-xl font-black">${PLANS[id].name}</h3><p class="text-3xl font-black tabular-nums">HK$${PLANS[id].price}</p><p class="text-xs text-muted">${PLANS[id].sites} 個工地 · ${PLANS[id].seats} 個帳戶 · ${PLANS[id].gb} GB</p></div>`).join("")}</div></div>`;
+    }
+
+    function renderAccount() {
+      const { user, company } = getScope();
+      return `<div class="space-y-4"><h1 class="text-3xl font-black">帳戶</h1><div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-1"><p class="font-bold">${esc(user.name)}</p><p class="text-sm text-muted">${ROLE_LABEL[user.role]} · ${esc(company?.name ?? "平台")}</p></div><div class="rounded-3xl border border-line bg-card p-4 shadow-card text-sm">${runtime.authMode === "firebase" ? `已透過 Firebase Authentication（${esc(runtime.cloudEmail || "")}）驗證身份，權限由 Firestore 同 Storage 安全規則喺雲端強制執行。` : esc(SECURITY_NOTE)}</div><div class="flex flex-wrap gap-2"><a href="#/login" class="inline-flex min-h-11 items-center rounded-full border border-line bg-card px-4 text-sm font-bold">換個身份試</a><button type="button" id="btn-signout" class="min-h-11 rounded-full border border-line bg-card px-4 text-sm font-bold">登出</button><button type="button" id="btn-reset-demo" class="min-h-11 rounded-full bg-paper-2 px-4 text-sm font-bold">重設示範資料</button></div></div>`;
+    }
+
+    function renderAdmin() {
+      const user = getUser();
+      if (!user || !can(user, "view_admin")) return deniedHtml();
+      const flags = state.featureFlags ?? DEFAULT_FEATURE_FLAGS;
+      const cat = state.catalog ?? DEFAULT_CATALOG;
+      const ghSaved = (() => { try { return JSON.parse(safeGet(GH_DEPLOY_KEY) || "{}"); } catch { return {}; } })();
+      const fbCfg = getSavedFbConfig();
+      const tab = runtime.adminTab;
+      const tabs = [["features", "功能開關"], ["members", "全平台成員"], ["catalog", "常用選項"], ["deploy", "一鍵部署 GitHub"], ["firebase", "Firebase 設定"]];
+      return `<div class="space-y-4">
+        <div><h1 class="text-3xl font-black">客戶公司 · 超級管理員控制台</h1><p class="text-sm text-muted">管理全站功能開關、跨公司成員、常用選項、一鍵推送 index.html 到 GitHub 同 Firebase 接駁（仍保持工地日誌隔離）。</p></div>
+        <div class="flex flex-wrap gap-2">${tabs.map(([id, lb]) => `<button type="button" data-admin-tab="${id}" class="min-h-11 rounded-full px-4 text-sm font-bold ${tab === id ? "bg-navy text-paper" : "border border-line bg-card"}">${lb}</button>`).join("")}</div>
+        ${tab === "features" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-2"><h2 class="text-xl font-black">網頁功能開關</h2>${Object.keys(FEATURE_LABELS).map((k) => { const on = flags[k] ?? true; return `<div class="flex items-center justify-between gap-3 rounded-2xl bg-paper-2 p-3"><div><p class="font-bold">${FEATURE_LABELS[k].label}</p><p class="text-xs text-muted">${FEATURE_LABELS[k].hint}</p></div><button type="button" data-flag="${k}" class="min-h-11 rounded-full px-4 text-sm font-bold ${on ? "bg-navy text-paper" : "border border-line bg-card"}">${on ? "已開啟" : "已關閉"}</button></div>`; }).join("")}</div>` : ""}
+        ${tab === "members" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3"><h2 class="text-xl font-black">全平台成員（${state.members.length}）</h2>${state.members.map((m) => { const comp = state.companies.find((c) => c.id === m.companyId); const isSelf = m.id === user.id; return `<div class="flex items-center justify-between gap-2 rounded-2xl bg-paper-2 p-3"><div><p class="font-bold">${esc(m.name)}${m.disabled ? ' <span class="text-xs text-clay">（已停用）</span>' : ""}</p><p class="text-xs text-muted">${esc(comp?.shortName ?? "平台")} · ${ROLE_LABEL[m.role]} · ${esc(m.phone)}</p></div>${isSelf ? `<span class="rounded-full bg-navy px-3 py-1 text-xs font-bold text-paper">目前身份</span>` : `<button type="button" data-toggle-member="${m.id}" class="min-h-10 rounded-full px-3 text-xs font-bold ${m.disabled ? "bg-gold text-ink" : "border border-line bg-card"}">${m.disabled ? "啟用" : "停用"}</button>`}</div>`; }).join("")}</div>` : ""}
+        ${tab === "catalog" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-4"><h2 class="text-xl font-black">常用選項（最多 20 項、每項 16 字）</h2>${[["processes", "常用工序"], ["trades", "常用工種"]].map(([k, lb]) => `<div class="space-y-2"><p class="font-bold">${lb}</p><div class="flex flex-wrap gap-2">${cat[k].map((it) => `<span class="inline-flex items-center gap-1 rounded-full bg-paper-2 py-1 pl-3 pr-2 text-sm">${esc(it)}<button type="button" data-cat-del="${k}:${esc(it)}" class="text-clay font-black">×</button></span>`).join("")}</div><div class="flex gap-2"><input id="cat-in-${k}" placeholder="加一個${lb}" class="min-h-11 flex-1 rounded-2xl border border-line px-3 text-sm" /><button type="button" data-cat-add="${k}" class="min-h-11 rounded-full bg-gold px-4 text-sm font-black text-ink">加入</button></div></div>`).join("")}</div>` : ""}
+        ${tab === "deploy" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3"><h2 class="text-xl font-black">一鍵推送 index.html 到 GitHub</h2><p class="text-sm text-muted">Token 只存喺你部機瀏覽器，一掣用 GitHub Contents API 直接覆蓋 <code>index.html</code> 上線。</p><div class="grid gap-2 md:grid-cols-2"><label class="block text-sm"><span>Owner</span><input id="gh-owner" value="${esc(ghSaved.owner || "lm1668-cpu")}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" /></label><label class="block text-sm"><span>Repo</span><input id="gh-repo" value="${esc(ghSaved.repo || "dipan-tong")}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" /></label><label class="block text-sm"><span>Branch</span><input id="gh-branch" value="${esc(ghSaved.branch || "main")}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" /></label><label class="block text-sm"><span>Path</span><input id="gh-path" value="${esc(ghSaved.path || "index.html")}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" /></label></div><label class="block text-sm"><span>GitHub Token（Contents: Read &amp; Write）</span><input id="gh-pat" type="password" value="" placeholder="github_pat_..." class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" /></label><div class="flex flex-wrap gap-2"><button type="button" id="btn-gh-push" class="min-h-11 rounded-full bg-gold px-5 text-sm font-black text-ink">一鍵部署 index.html 到 GitHub</button><button type="button" id="btn-gh-save" class="min-h-11 rounded-full bg-paper-2 px-4 text-sm font-bold">儲存本機設定</button></div><div id="gh-deploy-status" class="hidden rounded-2xl px-4 py-3 text-sm font-bold"></div></div>` : ""}
+        ${tab === "firebase" ? `<div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3"><h2 class="text-xl font-black">Firebase 雲端設定（renocamp-site）</h2><div class="grid gap-2 md:grid-cols-2">${["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"].map((k) => `<label class="block text-sm"><span>${k}</span><input id="fb-${k}" value="${esc(fbCfg[k] || "")}" class="mt-1 min-h-11 w-full rounded-2xl border border-line px-3 text-sm" /></label>`).join("")}</div><button type="button" id="btn-fb-save" class="min-h-11 rounded-full bg-gold px-5 text-sm font-black text-ink">儲存 Firebase 設定並啟用登入</button></div>` : ""}
+        <div class="rounded-3xl border border-line bg-card p-4 shadow-card space-y-3"><h2 class="text-xl font-black">客戶公司訂閱（用量到頂只提醒，唔鎖唔刪）</h2>${state.companies.map((c) => { const p = PLANS[c.plan], sc = state.sites.filter((s) => s.companyId === c.id).length, mc = state.members.filter((m) => m.companyId === c.id).length; return `<div class="rounded-2xl bg-paper-2 p-3 space-y-2"><div class="flex justify-between"><p class="font-bold">${esc(c.name)}</p><span class="rounded-full bg-navy px-2.5 py-0.5 text-xs font-bold text-paper">${p.name}</span></div><p class="text-xs text-muted">工地 ${sc}/${p.sites} · 帳戶 ${mc}/${p.seats} · 儲存 ${c.storageUsedGb}/${p.gb} GB</p>${c.status === "trial" ? `<button type="button" data-extend-trial="${c.id}" class="min-h-10 rounded-full bg-gold px-3 text-xs font-bold text-ink">試用加七日</button>` : ""}</div>`; }).join("")}</div>
+      </div>`;
+    }
+
+    // =========================================================================
+    // Main Render & Event Wiring
+    // =========================================================================
+    function render() {
+      const root = document.getElementById("app"), path = getPath();
+      if (path === "/" || path === "") root.innerHTML = renderMarketing();
+      else if (path === "/login") root.innerHTML = renderLogin();
+      else if (path.startsWith("/app")) {
+        let inner = "";
+        if (path === "/app" || path === "/app/") inner = renderOverview();
+        else if (path === "/app/sites") inner = renderSites();
+        else if (path.startsWith("/app/sites/")) inner = renderSiteDetail(path.replace("/app/sites/", ""));
+        else if (path === "/app/tasks") inner = renderTasks();
+        else if (path === "/app/logs") inner = renderLogs();
+        else if (path === "/app/people") inner = renderPeople();
+        else if (path === "/app/materials") inner = renderMaterials();
+        else if (path === "/app/files") inner = renderFiles();
+        else if (path === "/app/reports") inner = renderReports();
+        else if (path === "/app/billing") inner = renderBilling();
+        else if (path === "/app/admin") inner = renderAdmin();
+        else if (path === "/app/account") inner = renderAccount();
+        else inner = renderOverview();
+        root.innerHTML = renderAppShell(path, inner);
+      } else root.innerHTML = renderMarketing();
+      bindEvents();
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('a[href^="#/"]').forEach((a) => {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          const target = (a.getAttribute("href") || "#/").replace(/^#/, "");
+          go(target);
+        });
+      });
+      document.querySelectorAll("[data-scroll]").forEach((b) => b.addEventListener("click", () => document.getElementById(b.dataset.scroll)?.scrollIntoView({ behavior: "smooth" })));
+      document.querySelectorAll("[data-login]").forEach((b) => b.addEventListener("click", () => {
+        const m = state.members.find((x) => x.id === b.dataset.login);
+        if (!m || m.disabled) return;
+        state.sessionUserId = m.id; runtime.authMode = "demo"; runtime.cloudEmail = null; runtime.cloudStatus = "offline"; saveStore();
+        go(m.role === "platform_admin" ? "/app/admin" : "/app");
+      }));
+      document.getElementById("cloud-login-btn")?.addEventListener("click", async () => {
+        const res = await cloudLogin(document.getElementById("cloud-email")?.value || "", document.getElementById("cloud-pass")?.value || "");
+        if (!res.ok) { const e = document.getElementById("cloud-login-err"); if (e) { e.textContent = res.error; e.classList.remove("hidden"); } return; }
+        toast("Firebase 登入成功！");
+        go(getUser()?.role === "platform_admin" ? "/app/admin" : "/app");
+      });
+      document.getElementById("nav-more-btn")?.addEventListener("click", () => { runtime.moreOpen = true; render(); });
+      document.getElementById("close-more-bg")?.addEventListener("click", () => { runtime.moreOpen = false; render(); });
+      document.getElementById("close-more-x")?.addEventListener("click", () => { runtime.moreOpen = false; render(); });
+      document.getElementById("modal-close-bg")?.addEventListener("click", () => { runtime.modal = null; render(); });
+      document.getElementById("modal-close-x")?.addEventListener("click", () => { runtime.modal = null; render(); });
+      document.querySelectorAll("[data-site-tab]").forEach((b) => b.addEventListener("click", () => { runtime.siteTab = b.dataset.siteTab; render(); }));
+      document.querySelectorAll("[data-task-filter]").forEach((b) => b.addEventListener("click", () => { runtime.taskFilter = b.dataset.taskFilter; render(); }));
+      document.querySelectorAll("[data-admin-tab]").forEach((b) => b.addEventListener("click", () => { runtime.adminTab = b.dataset.adminTab; render(); }));
+
+      // Open Modals
+      document.querySelectorAll("[data-open-modal]").forEach((b) => b.addEventListener("click", () => {
+        const t = b.dataset.openModal;
+        runtime.modal = t === "snag" ? { type: "task", kind: "snag" } : t === "task" ? { type: "task", kind: "task" } : { type: t };
+        render();
+      }));
+      document.querySelectorAll("[data-open-log]").forEach((b) => b.addEventListener("click", () => { runtime.modal = { type: "log", siteId: b.dataset.openLog }; render(); }));
+      document.querySelectorAll("[data-edit-log]").forEach((b) => b.addEventListener("click", () => { runtime.modal = { type: "log", editId: b.dataset.editLog }; render(); }));
+      document.querySelectorAll("[data-open-site-task]").forEach((b) => b.addEventListener("click", () => { runtime.modal = { type: "task", kind: "task", siteId: b.dataset.openSiteTask }; render(); }));
+      document.querySelectorAll("[data-open-task]").forEach((b) => b.addEventListener("click", () => { runtime.modal = { type: "taskDetail", taskId: b.dataset.openTask, pendingPhotos: [] }; render(); }));
+
+      // Modal: Log
+      document.getElementById("ml-proc")?.addEventListener("change", (e) => {
+        const v = e.target.value, ta = document.getElementById("ml-work");
+        if (v && ta && !ta.value.includes(v)) ta.value = ta.value.trim() ? `${ta.value.trim()}、${v}` : v;
+        e.target.value = "";
+      });
+      document.getElementById("ml-use-checkin")?.addEventListener("click", () => {
+        const sid = document.getElementById("ml-site")?.value, dt = document.getElementById("ml-date")?.value;
+        const arr = state.checkins.filter((r) => r.siteId === sid && r.date === dt && !r.absent);
+        if (!arr.length) return toast("呢個工地今日未有人報到。", "bad");
+        const map = new Map();
+        for (const r of arr) map.set(r.trade || "雜工", (map.get(r.trade || "雜工") || 0) + 1);
+        document.getElementById("ml-hc").value = [...map.entries()].map(([k, v]) => `${k} ${v}`).join("、");
+        toast("已帶入今日報到人數");
+      });
+      document.getElementById("ml-copy-notes")?.addEventListener("click", () => {
+        const sid = document.getElementById("ml-site")?.value, dt = document.getElementById("ml-date")?.value;
+        const lines = state.checkins.filter((r) => r.siteId === sid && r.date === dt && (r.absent || r.note)).map((r) => (r.absent ? `${r.memberName}去唔到：${r.note}` : `${r.memberName}收工交帶：${r.note}`));
+        const ta = document.getElementById("ml-issues");
+        ta.value = ta.value.trim() ? `${ta.value.trim()}\n${lines.join("\n")}` : lines.join("\n");
+        toast("已寫入問題");
+      });
+      const submitLog = (asSubmit) => {
+        const hcRaw = (document.getElementById("ml-hc")?.value || "").split(/[、,，\n]+/).map((s) => s.trim()).filter(Boolean);
+        const headcount = hcRaw.map((part) => { const m = part.match(/^(.+?)\s*(\d+)$/); return m ? { trade: m[1].trim(), count: Number(m[2]) } : { trade: part, count: 1 }; });
+        const r = mutSaveLog({ id: runtime.modal?.editId, siteId: document.getElementById("ml-site").value, date: document.getElementById("ml-date").value, weather: document.getElementById("ml-weather").value, authorName: document.getElementById("ml-author").value, noWork: document.getElementById("ml-nowork").checked, work: document.getElementById("ml-work").value, headcount, deliveries: document.getElementById("ml-deliv").value, issues: document.getElementById("ml-issues").value, submit: asSubmit });
+        toast(r.ok ? (asSubmit ? "日誌已提交" : "草稿已儲存") : r.error, r.ok ? "ok" : "bad");
+        if (r.ok) { runtime.modal = null; render(); }
+      };
+      document.getElementById("ml-save-draft")?.addEventListener("click", () => submitLog(false));
+      document.getElementById("ml-submit")?.addEventListener("click", () => submitLog(true));
+
+      // Modal: Task
+      document.getElementById("mt-submit")?.addEventListener("click", () => {
+        const r = mutSaveTask({ kind: runtime.modal?.kind || "task", title: document.getElementById("mt-title").value, siteId: document.getElementById("mt-site").value, location: document.getElementById("mt-loc").value, description: document.getElementById("mt-desc").value, assigneeId: document.getElementById("mt-assignee")?.value || null, priority: document.getElementById("mt-prio").value, due: document.getElementById("mt-due").value });
+        toast(r.ok ? (r.warning || "任務已開") : r.error, r.ok ? "ok" : "bad");
+        if (r.ok) { runtime.modal = null; render(); }
+      });
+
+      // Modal: TaskDetail
+      const runTD = (cmd) => {
+        const r = mutActTask(runtime.modal.taskId, cmd);
+        toast(r.ok ? (r.warning || "已更新，操作人同時間已留低") : r.error, r.ok ? "ok" : "bad");
+        if (r.ok && cmd.type === "review") runtime.modal.pendingPhotos = [];
+        render();
+      };
+      document.getElementById("td-assign-btn")?.addEventListener("click", () => runTD({ type: "assign", assigneeId: document.getElementById("td-assign-sel").value }));
+      document.getElementById("td-start")?.addEventListener("click", () => runTD({ type: "start" }));
+      document.getElementById("td-review")?.addEventListener("click", () => runTD({ type: "review", donePhotos: runtime.modal?.pendingPhotos || [] }));
+      document.getElementById("td-approve")?.addEventListener("click", () => runTD({ type: "approve" }));
+      document.getElementById("td-return")?.addEventListener("click", () => runTD({ type: "return", note: document.getElementById("td-return-note").value }));
+      document.getElementById("td-block")?.addEventListener("click", () => runTD({ type: "block", reason: document.getElementById("td-block-reason").value }));
+      document.getElementById("td-unblock")?.addEventListener("click", () => runTD({ type: "unblock" }));
+      document.getElementById("td-photo")?.addEventListener("change", async (e) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        try { const ph = await compressPhoto(f); runtime.modal.pendingPhotos.push(ph); toast("完工相已附上，撳「交去驗收」會一併儲存"); render(); } catch (err) { toast(err.message, "bad"); }
+      });
+
+      // Modal: Material / WorkerMat / Site / Person
+      document.getElementById("mm-submit")?.addEventListener("click", () => {
+        const isW = runtime.modal?.type === "workerMat";
+        const r = mutSaveMaterial({ siteId: document.getElementById("mm-site").value, name: document.getElementById("mm-name").value, qty: document.getElementById("mm-qty").value, supplier: document.getElementById("mm-sup")?.value || "", neededBy: document.getElementById("mm-due")?.value || todayISO(), note: document.getElementById("mm-note").value }, isW);
+        toast(r.ok ? (isW ? "已交畀公司跟" : "材料跟進已儲存") : r.error, r.ok ? "ok" : "bad");
+        if (r.ok) { runtime.modal = null; render(); }
+      });
+      document.getElementById("ms-submit")?.addEventListener("click", () => {
+        const r = mutSaveSite({ name: document.getElementById("ms-name").value, district: document.getElementById("ms-dist").value, address: document.getElementById("ms-addr").value, client: document.getElementById("ms-client").value, supervisorId: document.getElementById("ms-sup").value, targetDate: document.getElementById("ms-date").value, stage: "開工" });
+        toast(r.ok ? "工地已開" : r.error, r.ok ? "ok" : "bad");
+        if (r.ok) { runtime.modal = null; render(); }
+      });
+      document.getElementById("mp-submit")?.addEventListener("click", () => {
+        const r = mutAddMember({ name: document.getElementById("mp-name").value, role: document.getElementById("mp-role").value, trade: document.getElementById("mp-trade").value, phone: document.getElementById("mp-phone").value });
+        toast(r.ok ? "帳戶已加" : r.error, r.ok ? "ok" : "bad");
+        if (r.ok) { runtime.modal = null; render(); }
+      });
+
+      // Inline Actions: Attendance, DeskLoop, Materials, Trades, Sub assignment
+      document.querySelectorAll("[data-arrive]").forEach((b) => b.addEventListener("click", () => { const r = mutArrive(b.dataset.arrive); toast(r.ok ? "已報到" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-leave]").forEach((b) => b.addEventListener("click", () => { const r = mutLeave(b.dataset.leave, prompt("走之前交帶（冇就留空）：") ?? ""); toast(r.ok ? "已收工" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-absent]").forEach((b) => b.addEventListener("click", () => { const r = mutAbsent(b.dataset.absent, prompt("點解今日去唔到：") ?? ""); toast(r.ok ? "已話俾主管知" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-nudge]").forEach((b) => b.addEventListener("click", () => { const r = mutNudge(b.dataset.nudge, prompt("催交訊息：", "請今日收工前交日誌。") ?? ""); toast(r.ok ? "已催主管" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-instruct]").forEach((b) => b.addEventListener("click", () => { const r = mutInstruct(b.dataset.instruct, prompt("落指示：") ?? ""); toast(r.ok ? "指示已落" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-ack-ins]").forEach((b) => b.addEventListener("click", () => { const r = mutAckInstruction(b.dataset.ackIns); toast(r.ok ? "已回覆收到" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-close-day]").forEach((b) => b.addEventListener("click", () => { const r = mutCloseDay(b.dataset.closeDay, prompt("收工交帶：") ?? ""); toast(r.ok ? (r.warning || "呢個盤今日收工") : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-mat-status]").forEach((sel) => sel.addEventListener("change", () => { const r = mutSetMaterialStatus(sel.dataset.matStatus, sel.value); toast(r.ok ? "材料狀態已更新" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-confirm-mat]").forEach((b) => b.addEventListener("click", () => { const r = mutConfirmMaterial(b.dataset.confirmMat); toast(r.ok ? "已確認收到" : r.error, r.ok ? "ok" : "bad"); render(); }));
+      document.querySelectorAll("[data-trade-site]").forEach((inp) => inp.addEventListener("change", () => {
+        const u = getUser(), s = state.sites.find((x) => x.id === inp.dataset.tradeSite);
+        if (!can(u, "edit_site", s)) return;
+        s.trades[Number(inp.dataset.tradeIdx)].progress = Number(inp.value);
+        saveStore(); render();
+      }));
+      document.querySelectorAll("[data-toggle-sub-site]").forEach((b) => b.addEventListener("click", () => {
+        const u = getUser(), s = state.sites.find((x) => x.id === b.dataset.toggleSubSite), mid = b.dataset.toggleSubId;
+        if (!can(u, "assign_sub", s)) return;
+        s.assignedSubIds = s.assignedSubIds.includes(mid) ? s.assignedSubIds.filter((x) => x !== mid) : [...s.assignedSubIds, mid];
+        saveStore(); render();
+      }));
+
+      // Super Admin Actions
+      document.querySelectorAll("[data-flag]").forEach((b) => b.addEventListener("click", () => {
+        if (!can(getUser(), "view_admin")) return;
+        const k = b.dataset.flag; state.featureFlags[k] = !(state.featureFlags[k] ?? true); saveStore(); toast(`已${state.featureFlags[k] ? "開啟" : "關閉"}「${FEATURE_LABELS[k].label}」`); render();
+      }));
+      document.querySelectorAll("[data-toggle-member]").forEach((b) => b.addEventListener("click", () => {
+        const u = getUser(); if (!can(u, "view_admin")) return;
+        const m = state.members.find((x) => x.id === b.dataset.toggleMember); if (!m || m.id === u.id) return;
+        m.disabled = !m.disabled; saveStore(); toast(`已${m.disabled ? "停用" : "啟用"}${m.name}`); render();
+      }));
+      document.querySelectorAll("[data-cat-add]").forEach((b) => b.addEventListener("click", () => {
+        if (!can(getUser(), "view_admin")) return;
+        const k = b.dataset.catAdd, v = (document.getElementById(`cat-in-${k}`)?.value || "").trim();
+        if (!v || v.length > 16) return toast("選項必須 1–16 個字", "bad");
+        if (state.catalog[k].length >= 20 || state.catalog[k].includes(v)) return toast("已重複或到達 20 項上限", "bad");
+        state.catalog[k].push(v); saveStore(); void cloudWrite(["platformConfig", "commonOptions"], state.catalog); toast("已加入選項"); render();
+      }));
+      document.querySelectorAll("[data-cat-del]").forEach((b) => b.addEventListener("click", () => {
+        if (!can(getUser(), "view_admin")) return;
+        const [k, label] = b.dataset.catDel.split(":");
+        state.catalog[k] = state.catalog[k].filter((x) => x !== label); saveStore(); void cloudWrite(["platformConfig", "commonOptions"], state.catalog); render();
+      }));
+      document.querySelectorAll("[data-extend-trial]").forEach((b) => b.addEventListener("click", () => {
+        if (!can(getUser(), "manage_billing")) return;
+        const c = state.companies.find((x) => x.id === b.dataset.extendTrial);
+        if (!c || c.status !== "trial") return;
+        c.trialEnds = addDays(c.trialEnds && c.trialEnds > todayISO() ? c.trialEnds : todayISO(), 7); saveStore(); toast(`已幫${c.shortName}試用加七日至 ${c.trialEnds}`); render();
+      }));
+      document.getElementById("btn-gh-save")?.addEventListener("click", () => {
+        safeSet(GH_DEPLOY_KEY, JSON.stringify({ owner: document.getElementById("gh-owner").value.trim(), repo: document.getElementById("gh-repo").value.trim(), branch: document.getElementById("gh-branch").value.trim() || "main", path: document.getElementById("gh-path").value.trim() || "index.html", token: document.getElementById("gh-pat").value.trim() }));
+        toast("已儲存 GitHub 設定喺呢部瀏覽器");
+      });
+      const patInput = document.getElementById("gh-pat");
+      if (patInput) {
+        try { patInput.value = (JSON.parse(safeGet(GH_DEPLOY_KEY) || "{}")).token || ""; } catch {}
+      }
+      document.getElementById("btn-gh-push")?.addEventListener("click", async () => {
+        const btn = document.getElementById("btn-gh-push");
+        const box = document.getElementById("gh-deploy-status");
+        const showStatus = (msg, bad = false) => {
+          if (box) {
+            box.textContent = msg;
+            box.className = `rounded-2xl px-4 py-3 text-sm font-bold ${bad ? "bg-clay-soft text-clay" : "bg-navy text-paper"}`;
+          }
+          toast(msg, bad ? "bad" : "ok");
+        };
+        const owner = document.getElementById("gh-owner").value.trim(), repo = document.getElementById("gh-repo").value.trim(), branch = document.getElementById("gh-branch").value.trim() || "main", path = document.getElementById("gh-path").value.trim() || "index.html", token = document.getElementById("gh-pat").value.trim();
+        if (!token) return showStatus("請先貼上 GitHub Token（需 Contents: Read & Write 權限）", true);
+        safeSet(GH_DEPLOY_KEY, JSON.stringify({ owner, repo, branch, path, token }));
+        if (btn) { btn.disabled = true; btn.textContent = "推送緊去 GitHub…"; }
+        showStatus("連線緊 GitHub API…");
+        try {
+          const clone = document.documentElement.cloneNode(true);
+          const appDiv = clone.querySelector("#app"); if (appDiv) appDiv.innerHTML = "";
+          const toastDiv = clone.querySelector("#toast-wrap"); if (toastDiv) toastDiv.innerHTML = "";
+          clone.querySelectorAll("style").forEach((st) => { if (st.id !== "deitong-style") st.remove(); });
+          const cleanHtml = "<!doctype html>\n" + clone.outerHTML;
+          if (/(?:github_pat_|ghp_)[A-Za-z0-9_]{20,}/.test(cleanHtml)) {
+            return showStatus("安全攔截：偵測到輸出包含 Token，已取消推送。", true);
+          }
+          const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+          const headers = { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28" };
+          let sha;
+          const g = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
+          if (g.ok) sha = (await g.json()).sha;
+          const bytes = new TextEncoder().encode(cleanHtml);
+          let bin = ""; for (const b of bytes) bin += String.fromCharCode(b);
+          const p = await fetch(apiUrl, { method: "PUT", headers, body: JSON.stringify({ message: `deploy: update ${path} from Deitong Super Admin`, content: btoa(bin), branch, ...(sha ? { sha } : {}) }) });
+          if (!p.ok) return showStatus(`推送失敗（HTTP ${p.status}）：${(await p.json().catch(() => ({}))).message || "請檢查 Token 權限"}`, true);
+          showStatus("已成功由預覽一鍵推送 index.html 到 GitHub！等約 30 秒刷新網頁即見新版。");
+        } catch (err) {
+          showStatus(`無法由預覽直連 GitHub（${err?.message || "預覽沙盒限制外連"}），請喺 Canvas 下載 index.html 直接拖上倉庫。`, true);
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = "一鍵部署 index.html 到 GitHub"; }
+        }
+      });
+      document.getElementById("btn-fb-save")?.addEventListener("click", () => {
+        const cfg = {}; for (const k of ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"]) cfg[k] = (document.getElementById(`fb-${k}`)?.value || "").trim();
+        safeSet(FB_CONFIG_KEY, JSON.stringify(cfg)); toast("已儲存 Firebase 設定！"); void initFirebaseIfReady();
+      });
+      document.getElementById("btn-signout")?.addEventListener("click", async () => {
+        if (runtime.fbAuth && fbMods) await fbMods.authMod.signOut(runtime.fbAuth);
+        state.sessionUserId = null; runtime.authMode = "demo"; runtime.cloudEmail = null; runtime.cloudStatus = "offline"; saveStore(); go("/");
+      });
+      document.getElementById("btn-reset-demo")?.addEventListener("click", () => {
+        const keep = state.sessionUserId; state = createDemoData(); state.sessionUserId = keep; saveStore(); toast("示範資料已重設"); render();
+      });
+    }
+
+    void initFirebaseIfReady();
+    render();
+    })();
+  </script>
+
+</body></html>
